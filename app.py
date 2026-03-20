@@ -2,12 +2,11 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import os
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import google.generativeai as genai
 
-import os
-os.environ["GOOGLE_API_KEY"] = st.secrets["GEMINI_API_KEY"]
 st.set_page_config(
     page_title="Heart Disease Predictor",
     page_icon="🫀",
@@ -221,7 +220,7 @@ def encode_inputs(bmi, smoking, alcohol, stroke, physical_health,
 # ── AI Health Tips (Google Gemini - Free) ────────────────────────────────────
 def get_ai_health_tips(patient_data: dict, risk_score: float) -> str:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    gemini = genai.GenerativeModel("gemini-1.5-flash")
+    gemini = genai.GenerativeModel("gemini-2.0-flash")
 
     flags = []
     if patient_data["smoking"]:               flags.append("smoker")
