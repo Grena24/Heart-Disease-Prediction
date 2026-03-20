@@ -3,5 +3,5 @@ pandas
 numpy
 joblib
 matplotlib
+groq
 scikit-learn
-google-generativeai
