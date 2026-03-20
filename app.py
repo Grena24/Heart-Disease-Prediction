@@ -1,5 +1,3 @@
-import os
-os.environ["ANTHROPIC_API_KEY"] = st.secrets["ANTHROPIC_API_KEY"]
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -8,6 +6,9 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import anthropic
+
+# ✅ Add this AFTER all imports
+os.environ["ANTHROPIC_API_KEY"] = st.secrets["ANTHROPIC_API_KEY"]
 
 st.set_page_config(
     page_title="Heart Disease Predictor",
