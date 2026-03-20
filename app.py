@@ -12,44 +12,149 @@ st.set_page_config(
     layout="wide"
 )
 
-# ── Custom CSS ───────────────────────────────────────────────────────────────
+# ── Custom CSS – Full Black Theme ────────────────────────────────────────────
 st.markdown("""
 <style>
-    .main { background-color: #f8f9fa; }
+    /* ── Global background & text ── */
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"],
+    .main, .block-container {
+        background-color: #0a0a0a !important;
+        color: #e8e8e8 !important;
+    }
+    [data-testid="stSidebar"] { background-color: #111111 !important; }
+
+    /* ── Headings ── */
+    h1, h2, h3, h4, h5, h6,
+    [data-testid="stMarkdownContainer"] h1,
+    [data-testid="stMarkdownContainer"] h2,
+    [data-testid="stMarkdownContainer"] h3 {
+        color: #f0f0f0 !important;
+    }
+
+    /* ── Labels & helper text ── */
+    label, .stSelectbox label, .stSlider label,
+    .stNumberInput label, .stTextInput label,
+    .stCheckbox label, p, span {
+        color: #cccccc !important;
+    }
+
+    /* ── Input widgets ── */
+    .stTextInput input, .stNumberInput input {
+        background-color: #1a1a1a !important;
+        color: #e8e8e8 !important;
+        border: 1px solid #333 !important;
+        border-radius: 6px !important;
+    }
+    .stSelectbox > div > div {
+        background-color: #1a1a1a !important;
+        color: #e8e8e8 !important;
+        border: 1px solid #333 !important;
+    }
+    [data-baseweb="select"] * { color: #e8e8e8 !important; }
+    [data-baseweb="popover"] { background-color: #1a1a1a !important; }
+
+    /* ── Slider ── */
+    .stSlider [data-testid="stSlider"] { color: #e63946 !important; }
+
+    /* ── Checkbox ── */
+    .stCheckbox input[type="checkbox"] { accent-color: #e63946; }
+
+    /* ── Divider ── */
+    hr { border-color: #2a2a2a !important; }
+
+    /* ── Submit button ── */
+    .stFormSubmitButton > button {
+        background: linear-gradient(135deg, #e63946, #c1121f) !important;
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: 700 !important;
+        font-size: 16px !important;
+        padding: 14px !important;
+        transition: opacity 0.2s !important;
+    }
+    .stFormSubmitButton > button:hover { opacity: 0.88 !important; }
+
+    /* ── Metric cards ── */
+    [data-testid="metric-container"] {
+        background-color: #141414 !important;
+        border: 1px solid #2a2a2a !important;
+        border-radius: 10px !important;
+        padding: 16px !important;
+    }
+    [data-testid="metric-container"] label { color: #999 !important; font-size: 12px !important; }
+    [data-testid="metric-container"] [data-testid="stMetricValue"] {
+        color: #f0f0f0 !important;
+        font-size: 26px !important;
+        font-weight: 700 !important;
+    }
+
+    /* ── Patient header ── */
     .patient-header {
-        background: linear-gradient(135deg, #e63946, #c1121f);
+        background: linear-gradient(135deg, #c1121f, #7d0000);
         color: white;
         padding: 20px 30px;
         border-radius: 12px;
         margin-bottom: 20px;
+        border: 1px solid #3a0000;
     }
     .patient-header h2 { margin: 0; font-size: 26px; }
     .patient-header p  { margin: 4px 0 0; opacity: 0.85; font-size: 14px; }
+
+    /* ── Risk verdict banners ── */
     .risk-high {
-        background: #fff0f0;
+        background: #1a0505;
         border-left: 5px solid #e63946;
         padding: 16px 20px;
         border-radius: 8px;
         margin-bottom: 12px;
+        color: #ffb3b3;
     }
     .risk-low {
-        background: #f0fff4;
+        background: #051a0d;
         border-left: 5px solid #2d6a4f;
         padding: 16px 20px;
         border-radius: 8px;
         margin-bottom: 12px;
+        color: #90e0b0;
     }
+
+    /* ── Section title ── */
     .section-title {
-        font-size: 15px;
-        font-weight: 600;
-        color: #495057;
+        font-size: 13px;
+        font-weight: 700;
+        color: #888 !important;
         margin-bottom: 8px;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 1px;
+    }
+
+    /* ── Form container ── */
+    [data-testid="stForm"] {
+        background-color: #111111 !important;
+        border: 1px solid #222 !important;
+        border-radius: 12px !important;
+        padding: 24px !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
+# ── Matplotlib global dark style ─────────────────────────────────────────────
+plt.rcParams.update({
+    "figure.facecolor":  "#0d0d0d",
+    "axes.facecolor":    "#0d0d0d",
+    "savefig.facecolor": "#0d0d0d",
+    "text.color":        "#e8e8e8",
+    "axes.labelcolor":   "#e8e8e8",
+    "xtick.color":       "#aaaaaa",
+    "ytick.color":       "#aaaaaa",
+    "axes.edgecolor":    "#333333",
+    "grid.color":        "#2a2a2a",
+    "axes.spines.top":   False,
+    "axes.spines.right": False,
+})
+
+# ── Constants ─────────────────────────────────────────────────────────────────
 AGE_CATEGORIES = [
     "18-24","25-29","30-34","35-39","40-44",
     "45-49","50-54","55-59","60-64","65-69",
@@ -61,26 +166,19 @@ ETHNICITIES = sorted([
 ])
 GENERAL_HEALTH = ["Poor","Fair","Good","Very good","Excellent"]
 
-RISK_FACTORS = {
-    "Smoking": "Smoking",
-    "AlcoholDrinking": "Alcohol",
-    "Stroke": "Stroke",
-    "Diabetic": "Diabetic",
-    "KidneyDisease": "Kidney Disease",
-    "WalkingDifficulty": "Walking Difficulty",
-}
-
+# ── Model loader ──────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
     return joblib.load("heart_disease_rf_model.pkl")
 
+# ── Encoding ──────────────────────────────────────────────────────────────────
 def encode_inputs(bmi, smoking, alcohol, stroke, physical_health,
                   mental_health, walking_diff, gender, age_cat,
                   ethnicity, diabetic, physical_activity,
                   general_health, sleep_time, kidney_disease):
-    age_map      = {cat: i for i, cat in enumerate(AGE_CATEGORIES)}
+    age_map       = {cat: i for i, cat in enumerate(AGE_CATEGORIES)}
     ethnicity_map = {e: i for i, e in enumerate(ETHNICITIES)}
-    health_map   = {h: i for i, h in enumerate(GENERAL_HEALTH)}
+    health_map    = {h: i for i, h in enumerate(GENERAL_HEALTH)}
     return pd.DataFrame([{
         "BMI": bmi,
         "Smoking": int(smoking),
@@ -99,20 +197,19 @@ def encode_inputs(bmi, smoking, alcohol, stroke, physical_health,
         "KidneyDisease": int(kidney_disease),
     }])
 
+# ── Charts ────────────────────────────────────────────────────────────────────
+BG = "#0d0d0d"
+
 def gauge_chart(prob):
     fig, ax = plt.subplots(figsize=(5, 2.8), subplot_kw=dict(aspect="equal"))
-    fig.patch.set_facecolor("none")
-    ax.set_facecolor("none")
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor(BG)
 
-    # Background arc
+    # Coloured arc: green → red
     theta = np.linspace(np.pi, 0, 200)
     for i in range(len(theta) - 1):
         t = i / (len(theta) - 1)
-        color = (
-            0.18 + 0.72 * t,          # R
-            0.60 - 0.47 * t,          # G
-            0.18                       # B
-        )
+        color = (0.18 + 0.72 * t, 0.60 - 0.47 * t, 0.18)
         ax.plot([np.cos(theta[i]), np.cos(theta[i+1])],
                 [np.sin(theta[i]), np.sin(theta[i+1])],
                 color=color, linewidth=14, solid_capstyle="butt")
@@ -121,14 +218,14 @@ def gauge_chart(prob):
     angle = np.pi - prob * np.pi
     ax.annotate("", xy=(0.72 * np.cos(angle), 0.72 * np.sin(angle)),
                 xytext=(0, 0),
-                arrowprops=dict(arrowstyle="-|>", color="#1a1a2e",
+                arrowprops=dict(arrowstyle="-|>", color="#f0f0f0",
                                 lw=2.5, mutation_scale=18))
-    ax.add_patch(plt.Circle((0, 0), 0.08, color="#1a1a2e", zorder=5))
+    ax.add_patch(plt.Circle((0, 0), 0.08, color="#f0f0f0", zorder=5))
 
     ax.text(0, -0.22, f"{prob*100:.1f}%", ha="center", va="center",
-            fontsize=22, fontweight="bold", color="#1a1a2e")
-    ax.text(-1.0, -0.25, "Low", fontsize=9, color="#2d6a4f", fontweight="600")
-    ax.text( 0.80, -0.25, "High", fontsize=9, color="#e63946", fontweight="600")
+            fontsize=22, fontweight="bold", color="#f0f0f0")
+    ax.text(-1.0, -0.28, "Low",  fontsize=9, color="#52b788", fontweight="600")
+    ax.text( 0.72, -0.28, "High", fontsize=9, color="#e63946", fontweight="600")
 
     ax.set_xlim(-1.2, 1.2)
     ax.set_ylim(-0.4, 1.1)
@@ -136,45 +233,50 @@ def gauge_chart(prob):
     plt.tight_layout(pad=0)
     return fig
 
+
 def risk_factor_bar(input_row):
     factors = {
-        "Smoking":          input_row["Smoking"].values[0],
-        "Alcohol":          input_row["AlcoholDrinking"].values[0],
-        "Stroke":           input_row["Stroke"].values[0],
-        "Diabetic":         input_row["Diabetic"].values[0],
-        "Kidney Disease":   input_row["KidneyDisease"].values[0],
-        "Walking Diff.":    input_row["WalkingDifficulty"].values[0],
-        "Physical Activity":input_row["PhysicalActivity"].values[0],
+        "Smoking":           input_row["Smoking"].values[0],
+        "Alcohol":           input_row["AlcoholDrinking"].values[0],
+        "Stroke":            input_row["Stroke"].values[0],
+        "Diabetic":          input_row["Diabetic"].values[0],
+        "Kidney Disease":    input_row["KidneyDisease"].values[0],
+        "Walking Diff.":     input_row["WalkingDifficulty"].values[0],
+        "Physical Activity": input_row["PhysicalActivity"].values[0],
     }
     labels = list(factors.keys())
     values = [int(v) for v in factors.values()]
-    colors = ["#e63946" if v == 1 else "#adb5bd" for v in values]
+    colors = ["#e63946" if v == 1 else "#2a2a2a" for v in values]
 
     fig, ax = plt.subplots(figsize=(5, 3))
-    fig.patch.set_facecolor("none")
-    ax.set_facecolor("none")
-    bars = ax.barh(labels, values, color=colors, height=0.5, edgecolor="none")
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor(BG)
+
+    ax.barh(labels, values, color=colors, height=0.5, edgecolor="none")
     ax.set_xlim(0, 1.3)
     ax.set_xticks([0, 1])
-    ax.set_xticklabels(["No", "Yes"], fontsize=10)
-    ax.tick_params(axis="y", labelsize=10)
-    ax.spines[["top","right","bottom"]].set_visible(False)
-    ax.spines["left"].set_color("#dee2e6")
-    red_patch   = mpatches.Patch(color="#e63946", label="Present")
-    gray_patch  = mpatches.Patch(color="#adb5bd", label="Absent")
+    ax.set_xticklabels(["No", "Yes"], fontsize=10, color="#aaaaaa")
+    ax.tick_params(axis="y", labelsize=10, colors="#cccccc")
+    ax.spines["bottom"].set_color("#333333")
+    ax.spines["left"].set_color("#333333")
+
+    red_patch  = mpatches.Patch(color="#e63946", label="Present")
+    gray_patch = mpatches.Patch(color="#2a2a2a", label="Absent",
+                                edgecolor="#555", linewidth=0.8)
     ax.legend(handles=[red_patch, gray_patch], fontsize=8,
-              loc="lower right", framealpha=0)
+              loc="lower right", framealpha=0,
+              labelcolor="#cccccc")
     plt.tight_layout(pad=0.5)
     return fig
 
-def health_radar(physical_health, mental_health, bmi, sleep_time, general_health_idx):
-    fig, ax = plt.subplots(figsize=(4, 4),
-                           subplot_kw=dict(polar=True))
-    fig.patch.set_facecolor("none")
-    ax.set_facecolor("none")
 
-    categories = ["Physical\nHealth", "Mental\nHealth", "BMI\nRisk", "Sleep\nQuality", "Gen.\nHealth"]
-    # Normalise to 0-1 (1 = worst for health)
+def health_radar(physical_health, mental_health, bmi, sleep_time, general_health_idx):
+    fig, ax = plt.subplots(figsize=(4, 4), subplot_kw=dict(polar=True))
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor("#111111")
+
+    categories = ["Physical\nHealth", "Mental\nHealth", "BMI\nRisk",
+                  "Sleep\nQuality", "Gen.\nHealth"]
     values = [
         physical_health / 30,
         mental_health / 30,
@@ -182,7 +284,7 @@ def health_radar(physical_health, mental_health, bmi, sleep_time, general_health
         1 - min(sleep_time / 9, 1),
         1 - general_health_idx / 4,
     ]
-    values += values[:1]  # close polygon
+    values += values[:1]
 
     N = len(categories)
     angles = [n / float(N) * 2 * np.pi for n in range(N)]
@@ -191,26 +293,24 @@ def health_radar(physical_health, mental_health, bmi, sleep_time, general_health
     ax.set_theta_offset(np.pi / 2)
     ax.set_theta_direction(-1)
     ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(categories, fontsize=8.5)
+    ax.set_xticklabels(categories, fontsize=8.5, color="#cccccc")
     ax.set_ylim(0, 1)
     ax.set_yticks([0.25, 0.5, 0.75, 1.0])
     ax.set_yticklabels(["", "", "", ""], fontsize=7)
-    ax.grid(color="#dee2e6", linewidth=0.8)
+    ax.grid(color="#2a2a2a", linewidth=0.8)
+    ax.spines["polar"].set_color("#2a2a2a")
 
     ax.plot(angles, values, color="#e63946", linewidth=2)
-    ax.fill(angles, values, color="#e63946", alpha=0.25)
+    ax.fill(angles, values, color="#e63946", alpha=0.30)
     plt.tight_layout(pad=0.5)
     return fig
 
-# ── App ──────────────────────────────────────────────────────────────────────
-
+# ── App ───────────────────────────────────────────────────────────────────────
 st.title("🫀 Heart Disease Risk Predictor")
 
 model = load_model()
 
 with st.form("prediction_form"):
-
-    # Patient name
     st.subheader("Patient Details")
     patient_name = st.text_input("Patient Name", placeholder="e.g. Rahul Sharma")
 
@@ -219,13 +319,13 @@ with st.form("prediction_form"):
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        gender      = st.selectbox("Gender", ["Male", "Female"])
-        age_cat     = st.selectbox("Age Category", AGE_CATEGORIES, index=7)
-        ethnicity   = st.selectbox("Ethnicity", ETHNICITIES, index=5)
+        gender    = st.selectbox("Gender", ["Male", "Female"])
+        age_cat   = st.selectbox("Age Category", AGE_CATEGORIES, index=7)
+        ethnicity = st.selectbox("Ethnicity", ETHNICITIES, index=5)
 
     with col2:
-        bmi         = st.number_input("BMI", min_value=10.0, max_value=100.0, value=25.0, step=0.1)
-        sleep_time  = st.number_input("Avg Sleep (hrs/night)", min_value=1.0, max_value=24.0, value=7.0, step=0.5)
+        bmi            = st.number_input("BMI", min_value=10.0, max_value=100.0, value=25.0, step=0.1)
+        sleep_time     = st.number_input("Avg Sleep (hrs/night)", min_value=1.0, max_value=24.0, value=7.0, step=0.5)
         general_health = st.selectbox("General Health", GENERAL_HEALTH, index=3)
 
     with col3:
@@ -236,22 +336,21 @@ with st.form("prediction_form"):
     col4, col5, col6 = st.columns(3)
 
     with col4:
-        smoking     = st.checkbox("Smoker (100+ cigarettes lifetime)")
-        alcohol     = st.checkbox("Heavy Alcohol Drinker")
-        stroke      = st.checkbox("Had a Stroke")
+        smoking = st.checkbox("Smoker (100+ cigarettes lifetime)")
+        alcohol = st.checkbox("Heavy Alcohol Drinker")
+        stroke  = st.checkbox("Had a Stroke")
 
     with col5:
-        diabetic         = st.checkbox("Diabetic")
-        kidney_disease   = st.checkbox("Kidney Disease")
-        walking_diff     = st.checkbox("Difficulty Walking")
+        diabetic       = st.checkbox("Diabetic")
+        kidney_disease = st.checkbox("Kidney Disease")
+        walking_diff   = st.checkbox("Difficulty Walking")
 
     with col6:
         physical_activity = st.checkbox("Physically Active (last 30 days)", value=True)
 
     submitted = st.form_submit_button("🔍 Analyse Risk", use_container_width=True)
 
-# ── Results ──────────────────────────────────────────────────────────────────
-
+# ── Results ───────────────────────────────────────────────────────────────────
 if submitted:
     name_display = patient_name.strip() if patient_name.strip() else "Patient"
 
@@ -266,7 +365,7 @@ if submitted:
     prob       = model.predict_proba(input_df)[0][1]
     gh_idx     = GENERAL_HEALTH.index(general_health)
 
-    # Patient header banner
+    # Patient header
     st.markdown(f"""
     <div class="patient-header">
         <h2>📋 Report for {name_display}</h2>
@@ -274,7 +373,7 @@ if submitted:
     </div>
     """, unsafe_allow_html=True)
 
-    # Risk verdict
+    # Verdict
     if prediction == 1:
         st.markdown(f"""
         <div class="risk-high">
@@ -292,7 +391,7 @@ if submitted:
 
     st.divider()
 
-    # ── Three visualisations ─────────────────────────────────────────────────
+    # Visualisations
     v1, v2, v3 = st.columns(3)
 
     with v1:
@@ -308,12 +407,10 @@ if submitted:
         st.pyplot(health_radar(physical_health, mental_health, bmi, sleep_time, gh_idx),
                   use_container_width=True)
 
-    # ── Summary metrics ──────────────────────────────────────────────────────
+    # Summary metrics
     st.divider()
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Risk Score",        f"{prob*100:.1f}%")
-    m2.metric("BMI",               f"{bmi:.1f}")
-    m3.metric("Sleep",             f"{sleep_time} hrs")
-    m4.metric("Physical Health",   f"{physical_health}/30 bad days")
-
-  
+    m1.metric("Risk Score",      f"{prob*100:.1f}%")
+    m2.metric("BMI",             f"{bmi:.1f}")
+    m3.metric("Sleep",           f"{sleep_time} hrs")
+    m4.metric("Physical Health", f"{physical_health}/30 bad days")
