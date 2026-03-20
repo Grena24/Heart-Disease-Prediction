@@ -316,4 +316,4 @@ if submitted:
     m3.metric("Sleep",             f"{sleep_time} hrs")
     m4.metric("Physical Health",   f"{physical_health}/30 bad days")
 
-    st.caption("⚠️ For educational purposes only. Not a substitute for professional medical advice.")
+  
