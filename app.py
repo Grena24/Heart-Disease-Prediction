@@ -5,7 +5,7 @@ import joblib
 import os
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-import google.generativeai as genai
+from groq import Groq
 
 st.set_page_config(
     page_title="Heart Disease Predictor",
@@ -217,10 +217,9 @@ def encode_inputs(bmi, smoking, alcohol, stroke, physical_health,
         "KidneyDisease": int(kidney_disease),
     }])
 
-# ── AI Health Tips (Google Gemini - Free) ────────────────────────────────────
+# ── AI Health Tips (Groq - Free) ─────────────────────────────────────────────
 def get_ai_health_tips(patient_data: dict, risk_score: float) -> str:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    gemini = genai.GenerativeModel("gemini-2.0-flash")
+    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
     flags = []
     if patient_data["smoking"]:               flags.append("smoker")
@@ -258,8 +257,12 @@ Use these icons in order: 🏃 🥗 😴 🧘 💊
 Be warm, specific, and motivating. No generic advice.
 Output only the 5 lines — no intro, no outro, no extra text."""
 
-    response = gemini.generate_content(prompt)
-    return response.text
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=600,
+    )
+    return response.choices[0].message.content
 
 
 def render_tips_html(tips_text: str) -> str:
