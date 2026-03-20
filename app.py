@@ -214,6 +214,71 @@ st.markdown("""
         margin-top: 14px;
         font-style: italic;
     }
+
+    /* ── What-If Simulator ── */
+    .simulator-container {
+        background: linear-gradient(160deg, #0a0a14, #0f0f1e);
+        border: 1px solid #1e1e3a;
+        border-radius: 16px;
+        padding: 28px 32px;
+        margin-top: 8px;
+    }
+    .simulator-title {
+        font-size: 20px;
+        font-weight: 800;
+        background: linear-gradient(90deg, #60a5fa, #a78bfa, #e63946);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        display: block;
+        margin-bottom: 6px;
+    }
+    .simulator-subtitle {
+        font-size: 13px;
+        color: #666 !important;
+        margin-bottom: 22px;
+        display: block;
+    }
+    .sim-result-box {
+        background: #0d0d1a;
+        border: 1px solid #2a2a4a;
+        border-radius: 12px;
+        padding: 20px 24px;
+        text-align: center;
+        margin-top: 8px;
+    }
+    .sim-orig-score {
+        font-size: 14px;
+        color: #888 !important;
+        margin-bottom: 4px;
+    }
+    .sim-new-score {
+        font-size: 42px;
+        font-weight: 900;
+        color: #60a5fa;
+        line-height: 1.1;
+    }
+    .sim-drop-positive {
+        font-size: 18px;
+        font-weight: 700;
+        color: #52b788 !important;
+        margin-top: 6px;
+    }
+    .sim-drop-negative {
+        font-size: 18px;
+        font-weight: 700;
+        color: #e63946 !important;
+        margin-top: 6px;
+    }
+    .sim-insight {
+        background: #12121f;
+        border-left: 3px solid #60a5fa;
+        border-radius: 6px;
+        padding: 10px 14px;
+        margin-top: 10px;
+        font-size: 13px;
+        color: #b0b8d0 !important;
+        text-align: left;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -337,6 +402,45 @@ def render_tips_html(tips_text: str) -> str:
             cards_html += f'<div class="tip-card">{line}</div>'
     return cards_html
 
+
+
+# ── What-If Simulator ─────────────────────────────────────────────────────────
+def whatif_chart(original_prob, scenarios):
+    """Bar chart comparing original risk vs what-if scenarios."""
+    fig, ax = plt.subplots(figsize=(8, 3.8))
+    fig.patch.set_facecolor("#0d0d0d")
+    ax.set_facecolor("#0d0d0d")
+
+    labels = ["Current"] + [s["label"] for s in scenarios]
+    values = [original_prob * 100] + [s["prob"] * 100 for s in scenarios]
+    colors = []
+    for i, v in enumerate(values):
+        if i == 0:
+            colors.append("#555577")
+        elif v < original_prob * 100:
+            colors.append("#52b788")
+        else:
+            colors.append("#e63946")
+
+    bars = ax.barh(labels, values, color=colors, height=0.5, edgecolor="none")
+    ax.set_xlim(0, 105)
+    ax.axvline(50, color="#444", linewidth=0.8, linestyle="--")
+    ax.text(51, -0.6, "50%", fontsize=8, color="#555")
+
+    for bar, val in zip(bars, values):
+        ax.text(val + 1.2, bar.get_y() + bar.get_height()/2,
+                f"{val:.1f}%", va="center", fontsize=9,
+                color="#e8e8e8", fontweight="600")
+
+    ax.set_xlabel("Predicted Risk Score (%)", color="#aaaaaa", fontsize=10)
+    ax.tick_params(axis="y", labelsize=10, colors="#cccccc")
+    ax.tick_params(axis="x", colors="#777777")
+    ax.spines["bottom"].set_color("#333")
+    ax.spines["left"].set_color("#333")
+    ax.set_title("What-If: How Lifestyle Changes Affect Your Risk",
+                 color="#f0f0f0", fontsize=12, fontweight="700", pad=12)
+    plt.tight_layout(pad=0.8)
+    return fig
 
 # ── Charts ────────────────────────────────────────────────────────────────────
 BG = "#0d0d0d"
@@ -568,6 +672,125 @@ if submitted:
             """, unsafe_allow_html=True)
         except Exception as e:
             st.warning(f"Could not load AI tips: {e}")
+
+
+    # ── 🧠 What-If Simulator ───────────────────────────────────────────────────
+    st.divider()
+    st.markdown("""
+    <div class="simulator-container">
+        <span class="simulator-title">🧠 What-If Simulator</span>
+        <span class="simulator-subtitle">Adjust lifestyle factors below and instantly see how your heart disease risk changes using the same ML model.</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.expander("⚙️ Open What-If Simulator", expanded=True):
+        st.markdown("**Tweak the sliders to simulate lifestyle improvements:**")
+
+        wc1, wc2, wc3 = st.columns(3)
+        with wc1:
+            sim_bmi       = st.slider("💪 Simulate BMI",        10.0, 60.0, float(bmi),        0.5, key="sim_bmi")
+            sim_sleep     = st.slider("😴 Simulate Sleep (hrs)", 1.0,  12.0, float(sleep_time), 0.5, key="sim_sleep")
+        with wc2:
+            sim_phys      = st.slider("🏃 Physical Health Bad Days", 0, 30, physical_health, 1, key="sim_phys")
+            sim_mental    = st.slider("🧘 Mental Health Bad Days",   0, 30, mental_health,   1, key="sim_mental")
+        with wc3:
+            sim_smoking   = st.checkbox("🚬 Still Smoking",         value=smoking,          key="sim_smoke")
+            sim_active    = st.checkbox("🏋️ Physically Active",     value=physical_activity, key="sim_active")
+            sim_alcohol   = st.checkbox("🍺 Heavy Alcohol Drinker", value=alcohol,           key="sim_alc")
+            sim_gh        = st.selectbox("🩺 General Health",       GENERAL_HEALTH,
+                                         index=GENERAL_HEALTH.index(general_health), key="sim_gh")
+
+        # Build 4 preset scenarios + 1 custom
+        scenarios = []
+
+        # Scenario 1: Quit smoking (if smoker)
+        if smoking:
+            df_s1 = encode_inputs(bmi, False, alcohol, stroke, physical_health,
+                                  mental_health, walking_diff, gender, age_cat,
+                                  ethnicity, diabetic, physical_activity,
+                                  general_health, sleep_time, kidney_disease)
+            scenarios.append({"label": "Quit Smoking", "prob": model.predict_proba(df_s1)[0][1]})
+
+        # Scenario 2: Improve sleep to 8hrs
+        if sleep_time < 7.5:
+            df_s2 = encode_inputs(bmi, smoking, alcohol, stroke, physical_health,
+                                  mental_health, walking_diff, gender, age_cat,
+                                  ethnicity, diabetic, physical_activity,
+                                  general_health, 8.0, kidney_disease)
+            scenarios.append({"label": "Sleep 8 hrs", "prob": model.predict_proba(df_s2)[0][1]})
+
+        # Scenario 3: Reduce BMI by 3
+        if bmi > 22:
+            df_s3 = encode_inputs(max(18.5, bmi - 3), smoking, alcohol, stroke,
+                                  physical_health, mental_health, walking_diff,
+                                  gender, age_cat, ethnicity, diabetic,
+                                  physical_activity, general_health, sleep_time, kidney_disease)
+            scenarios.append({"label": f"BMI -{3}", "prob": model.predict_proba(df_s3)[0][1]})
+
+        # Scenario 4: Become physically active
+        if not physical_activity:
+            df_s4 = encode_inputs(bmi, smoking, alcohol, stroke, physical_health,
+                                  mental_health, walking_diff, gender, age_cat,
+                                  ethnicity, diabetic, True,
+                                  general_health, sleep_time, kidney_disease)
+            scenarios.append({"label": "Get Active", "prob": model.predict_proba(df_s4)[0][1]})
+
+        # Scenario 5: Best case — all improvements
+        df_best = encode_inputs(
+            max(18.5, bmi - 3), False, False, stroke,
+            max(0, physical_health - 5), max(0, mental_health - 5),
+            walking_diff, gender, age_cat, ethnicity, diabetic,
+            True, "Very good", min(9.0, sleep_time + 1.5), kidney_disease
+        )
+        scenarios.append({"label": "Best Case 🌟", "prob": model.predict_proba(df_best)[0][1]})
+
+        # Scenario 6: Custom (user sliders)
+        df_custom = encode_inputs(
+            sim_bmi, sim_smoking, sim_alcohol, stroke, sim_phys,
+            sim_mental, walking_diff, gender, age_cat, ethnicity,
+            diabetic, sim_active, sim_gh, sim_sleep, kidney_disease
+        )
+        custom_prob = model.predict_proba(df_custom)[0][1]
+        scenarios.append({"label": "🎛️ My Custom", "prob": custom_prob})
+
+        # ── Results ──
+        st.divider()
+        rc1, rc2 = st.columns([2, 1])
+
+        with rc1:
+            if scenarios:
+                st.pyplot(whatif_chart(prob, scenarios), use_container_width=True)
+
+        with rc2:
+            # Show custom scenario result prominently
+            delta     = prob - custom_prob
+            delta_pct = round(delta * 100, 1)
+            drop_class = "sim-drop-positive" if delta > 0 else "sim-drop-negative"
+            arrow      = "▼" if delta > 0 else "▲"
+            change_txt = f"{arrow} {abs(delta_pct)}% {'reduction' if delta > 0 else 'increase'} in risk"
+
+            # Insight message
+            insights = []
+            if sim_bmi < bmi - 1:       insights.append(f"Lowering BMI from {bmi} → {sim_bmi} helps reduce cardiac load.")
+            if sim_sleep > sleep_time:  insights.append(f"Better sleep ({sim_sleep}h) improves heart recovery cycles.")
+            if not sim_smoking and smoking: insights.append("Quitting smoking is the single highest-impact change.")
+            if sim_active and not physical_activity: insights.append("Becoming active significantly lowers risk.")
+            insight_html = "<br>".join(f"• {i}" for i in insights) if insights else "• Adjust the sliders above to see personalised insights."
+
+            st.markdown(f"""
+            <div class="sim-result-box">
+                <p class="sim-orig-score">Original Risk: {prob*100:.1f}%</p>
+                <p class="sim-new-score">{custom_prob*100:.1f}%</p>
+                <p class="{drop_class}">{change_txt}</p>
+                <div class="sim-insight">{insight_html}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Best case callout
+            best_prob = model.predict_proba(df_best)[0][1]
+            best_drop = round((prob - best_prob) * 100, 1)
+            if best_drop > 0:
+                st.success(f"🌟 With all improvements, risk could drop by **{best_drop}%** (to {best_prob*100:.1f}%)")
 
     # ── 📊 Save to Patient History ─────────────────────────────────────────────
     if "patient_history" not in st.session_state:
