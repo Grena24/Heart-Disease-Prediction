@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import json
+from datetime import datetime
 import numpy as np
 import joblib
 import os
@@ -150,6 +152,62 @@ st.markdown("""
         line-height: 1.6;
     }
     .tip-card b { color: #a78bfa; }
+
+    /* ── Patient History Table ── */
+    .history-container {
+        background: #0f0f0f;
+        border: 1px solid #2a2a2a;
+        border-radius: 14px;
+        padding: 22px 26px;
+        margin-top: 8px;
+    }
+    .history-title {
+        font-size: 17px;
+        font-weight: 700;
+        color: #f0f0f0 !important;
+        margin-bottom: 16px;
+        display: block;
+    }
+    .history-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #161616;
+        border: 1px solid #222;
+        border-radius: 8px;
+        padding: 10px 16px;
+        margin-bottom: 8px;
+        font-size: 13px;
+        color: #cccccc;
+    }
+    .history-row:hover { border-color: #444; }
+    .badge-high {
+        background: #3a0a0a;
+        color: #e63946;
+        border: 1px solid #e63946;
+        border-radius: 20px;
+        padding: 2px 10px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .badge-low {
+        background: #0a3a1a;
+        color: #52b788;
+        border: 1px solid #52b788;
+        border-radius: 20px;
+        padding: 2px 10px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .clear-btn button {
+        background: #1a1a1a !important;
+        color: #e63946 !important;
+        border: 1px solid #e63946 !important;
+        border-radius: 6px !important;
+        font-size: 12px !important;
+        padding: 4px 14px !important;
+    }
+
     .disclaimer {
         font-size: 11px;
         color: #555 !important;
@@ -501,8 +559,174 @@ if submitted:
             <div class="ai-tips-container">
                 <span class="ai-tips-title">✨ AI-Powered Personalised Health Tips for {name_display}</span>
                 {cards_html}
-                
+                <p class="disclaimer">
+                    ⚕️ These AI-generated tips are for informational purposes only and do not constitute
+                    medical advice. Always consult a qualified healthcare professional before making
+                    changes to your lifestyle or treatment plan.
+                </p>
             </div>
             """, unsafe_allow_html=True)
         except Exception as e:
             st.warning(f"Could not load AI tips: {e}")
+
+    # ── 📊 Save to Patient History ─────────────────────────────────────────────
+    if "patient_history" not in st.session_state:
+        st.session_state.patient_history = []
+
+    record = {
+        "name":       name_display,
+        "time":       datetime.now().strftime("%d %b %Y, %I:%M %p"),
+        "gender":     gender,
+        "age":        age_cat,
+        "bmi":        round(bmi, 1),
+        "sleep":      sleep_time,
+        "risk_score": round(prob * 100, 1),
+        "prediction": int(prediction),
+        "smoking":    smoking,
+        "diabetic":   diabetic,
+        "physical_health": physical_health,
+        "mental_health":   mental_health,
+        "general_health":  general_health,
+    }
+    # Avoid duplicate on re-run
+    if not st.session_state.patient_history or st.session_state.patient_history[-1] != record:
+        st.session_state.patient_history.append(record)
+
+# ── 📊 Patient History Section ────────────────────────────────────────────────
+if "patient_history" in st.session_state and len(st.session_state.patient_history) > 0:
+    history = st.session_state.patient_history
+
+    st.divider()
+    st.subheader("📊 Patient History")
+
+    # ── Clear button ──
+    if st.button("🗑️ Clear History"):
+        st.session_state.patient_history = []
+        st.rerun()
+
+    # ── History rows ──
+    rows_html = ""
+    for i, r in enumerate(reversed(history)):
+        badge = f'<span class="badge-high">⚠ High Risk</span>' if r["prediction"] == 1 else f'<span class="badge-low">✓ Low Risk</span>'
+        rows_html += f"""
+        <div class="history-row">
+            <span><b style="color:#f0f0f0">{r['name']}</b> &nbsp;·&nbsp; {r['gender']} &nbsp;·&nbsp; {r['age']}</span>
+            <span>BMI {r['bmi']} &nbsp;|&nbsp; Sleep {r['sleep']}h &nbsp;|&nbsp; {r['time']}</span>
+            <span>Risk: <b style="color:#e8e8e8">{r['risk_score']}%</b> &nbsp;{badge}</span>
+        </div>"""
+
+    st.markdown(f"""
+    <div class="history-container">
+        <span class="history-title">👥 All Analysed Patients — {len(history)} record(s)</span>
+        {rows_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── 📈 Risk Trend Chart ────────────────────────────────────────────────────
+    if len(history) >= 2:
+        st.divider()
+        st.subheader("📈 Risk Trend Chart")
+        st.caption("Compares risk scores across all analysed patients this session.")
+
+        names       = [f"{r['name']} ({r['age']})" for r in history]
+        risk_scores = [r["risk_score"] for r in history]
+        bmis        = [r["bmi"] for r in history]
+        sleeps      = [r["sleep"] for r in history]
+
+        fig, axes = plt.subplots(1, 3, figsize=(16, 4))
+        fig.patch.set_facecolor("#0d0d0d")
+
+        # ── Chart 1: Risk Score per Patient ──
+        ax1 = axes[0]
+        ax1.set_facecolor("#0d0d0d")
+        bar_colors = ["#e63946" if r["prediction"] == 1 else "#52b788" for r in history]
+        bars = ax1.bar(range(len(names)), risk_scores, color=bar_colors,
+                       edgecolor="none", width=0.55)
+        ax1.set_xticks(range(len(names)))
+        ax1.set_xticklabels([r["name"] for r in history], rotation=25,
+                            ha="right", fontsize=9, color="#cccccc")
+        ax1.set_ylabel("Risk Score (%)", color="#aaaaaa", fontsize=10)
+        ax1.set_ylim(0, 105)
+        ax1.axhline(50, color="#555", linewidth=0.8, linestyle="--")
+        ax1.text(len(names) - 0.5, 52, "50% threshold", fontsize=8,
+                 color="#666", ha="right")
+        for bar, val in zip(bars, risk_scores):
+            ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1.5,
+                     f"{val}%", ha="center", va="bottom", fontsize=8,
+                     color="#e8e8e8", fontweight="600")
+        ax1.set_title("Risk Score per Patient", color="#f0f0f0",
+                      fontsize=12, fontweight="700", pad=12)
+        ax1.spines["bottom"].set_color("#333")
+        ax1.spines["left"].set_color("#333")
+        ax1.tick_params(colors="#aaaaaa")
+
+        # ── Chart 2: Risk Score Trend Line ──
+        ax2 = axes[1]
+        ax2.set_facecolor("#0d0d0d")
+        x = range(len(history))
+        ax2.plot(x, risk_scores, color="#e63946", linewidth=2.5,
+                 marker="o", markersize=7, markerfacecolor="#ff6b6b",
+                 markeredgecolor="#e63946", zorder=3)
+        ax2.fill_between(x, risk_scores, alpha=0.15, color="#e63946")
+        ax2.set_xticks(x)
+        ax2.set_xticklabels([r["name"] for r in history], rotation=25,
+                            ha="right", fontsize=9, color="#cccccc")
+        ax2.set_ylabel("Risk Score (%)", color="#aaaaaa", fontsize=10)
+        ax2.set_ylim(0, 105)
+        ax2.axhline(50, color="#555", linewidth=0.8, linestyle="--")
+        for xi, val in zip(x, risk_scores):
+            ax2.annotate(f"{val}%", (xi, val), textcoords="offset points",
+                         xytext=(0, 10), ha="center", fontsize=8,
+                         color="#e8e8e8")
+        ax2.set_title("Risk Score Trend", color="#f0f0f0",
+                      fontsize=12, fontweight="700", pad=12)
+        ax2.spines["bottom"].set_color("#333")
+        ax2.spines["left"].set_color("#333")
+        ax2.tick_params(colors="#aaaaaa")
+        ax2.grid(axis="y", color="#1e1e1e", linewidth=0.8)
+
+        # ── Chart 3: BMI vs Sleep Scatter ──
+        ax3 = axes[2]
+        ax3.set_facecolor("#0d0d0d")
+        sc_colors = ["#e63946" if r["prediction"] == 1 else "#52b788" for r in history]
+        scatter = ax3.scatter(bmis, sleeps, c=sc_colors, s=120,
+                              edgecolors="#444", linewidths=0.8, zorder=3)
+        for i, r in enumerate(history):
+            ax3.annotate(r["name"], (bmis[i], sleeps[i]),
+                         textcoords="offset points", xytext=(6, 4),
+                         fontsize=8, color="#aaaaaa")
+        ax3.set_xlabel("BMI", color="#aaaaaa", fontsize=10)
+        ax3.set_ylabel("Sleep (hrs)", color="#aaaaaa", fontsize=10)
+        ax3.set_title("BMI vs Sleep Quality", color="#f0f0f0",
+                      fontsize=12, fontweight="700", pad=12)
+        ax3.spines["bottom"].set_color("#333")
+        ax3.spines["left"].set_color("#333")
+        ax3.tick_params(colors="#aaaaaa")
+        ax3.grid(color="#1e1e1e", linewidth=0.8)
+
+        from matplotlib.lines import Line2D
+        legend_elements = [
+            Line2D([0], [0], marker="o", color="w", markerfacecolor="#e63946",
+                   markersize=9, label="High Risk"),
+            Line2D([0], [0], marker="o", color="w", markerfacecolor="#52b788",
+                   markersize=9, label="Low Risk"),
+        ]
+        ax3.legend(handles=legend_elements, fontsize=8, framealpha=0,
+                   labelcolor="#cccccc", loc="upper right")
+
+        plt.tight_layout(pad=2.0)
+        st.pyplot(fig, use_container_width=True)
+
+        # ── Summary Stats ──
+        st.divider()
+        s1, s2, s3, s4 = st.columns(4)
+        high_risk = sum(1 for r in history if r["prediction"] == 1)
+        avg_risk  = round(sum(r["risk_score"] for r in history) / len(history), 1)
+        avg_bmi   = round(sum(r["bmi"] for r in history) / len(history), 1)
+        avg_sleep = round(sum(r["sleep"] for r in history) / len(history), 1)
+        s1.metric("Total Patients",  len(history))
+        s2.metric("High Risk Count", f"{high_risk} / {len(history)}")
+        s3.metric("Avg Risk Score",  f"{avg_risk}%")
+        s4.metric("Avg BMI",         avg_bmi)
+    else:
+        st.info("📈 Analyse at least 2 patients to see the Risk Trend Chart.")
