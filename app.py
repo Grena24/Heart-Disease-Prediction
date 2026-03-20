@@ -501,11 +501,7 @@ if submitted:
             <div class="ai-tips-container">
                 <span class="ai-tips-title">✨ AI-Powered Personalised Health Tips for {name_display}</span>
                 {cards_html}
-                <p class="disclaimer">
-                    ⚕️ These AI-generated tips are for informational purposes only and do not constitute
-                    medical advice. Always consult a qualified healthcare professional before making
-                    changes to your lifestyle or treatment plan.
-                </p>
+                
             </div>
             """, unsafe_allow_html=True)
         except Exception as e:
