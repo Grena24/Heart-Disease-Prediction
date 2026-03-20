@@ -2,118 +2,105 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-st.set_page_config(
-    page_title="Heart Disease Predictor",
-    page_icon="🫀",
-    layout="wide"
-)
+st.set_page_config(page_title="Heart Disease Prediction", page_icon="❤️", layout="centered")
 
-AGE_CATEGORIES = [
-    "18-24", "25-29", "30-34", "35-39", "40-44",
-    "45-49", "50-54", "55-59", "60-64", "65-69",
-    "70-74", "75-79", "80 or older"
-]
-ETHNICITIES = sorted([
-    "American Indian/Alaskan Native", "Asian", "Black",
-    "Hispanic", "Other", "White"
-])
-GENERAL_HEALTH = ["Poor", "Fair", "Good", "Very good", "Excellent"]
+# Load model
+model = joblib.load("heart_disease_rf_model.pkl")
 
-@st.cache_resource
-def load_model():
-    return joblib.load("heart_disease_rf_model.pkl")
+st.title("❤️ Heart Disease Prediction App")
+st.write("Fill in the details below to predict heart disease risk.")
 
-def encode_inputs(bmi, smoking, alcohol, stroke, physical_health,
-                  mental_health, walking_diff, gender, age_cat,
-                  ethnicity, diabetic, physical_activity,
-                  general_health, sleep_time, kidney_disease):
-    age_map = {cat: i for i, cat in enumerate(AGE_CATEGORIES)}
-    ethnicity_map = {e: i for i, e in enumerate(ETHNICITIES)}
-    health_map = {h: i for i, h in enumerate(GENERAL_HEALTH)}
+# Mappings
+yes_no_map = {"No": 0, "Yes": 1}
+gender_map = {"Female": 0, "Male": 1}
 
-    return pd.DataFrame([{
-        "BMI": bmi,
-        "Smoking": int(smoking),
-        "AlcoholDrinking": int(alcohol),
-        "Stroke": int(stroke),
-        "PhysicalHealth": physical_health,
-        "MentalHealth": mental_health,
-        "WalkingDifficulty": int(walking_diff),
-        "Gender": 1 if gender == "Male" else 0,
-        "AgeCategory": age_map.get(age_cat, 7),
-        "Ethnicity": ethnicity_map.get(ethnicity, 5),
-        "Diabetic": int(diabetic),
-        "PhysicalActivity": int(physical_activity),
-        "GeneralHealth": health_map.get(general_health, 3),
-        "SleepTime": sleep_time,
-        "KidneyDisease": int(kidney_disease),
-    }])
+age_map = {
+    "18-24": 0,
+    "25-29": 1,
+    "30-34": 2,
+    "35-39": 3,
+    "40-44": 4,
+    "45-49": 5,
+    "50-54": 6,
+    "55-59": 7,
+    "60-64": 8,
+    "65-69": 9,
+    "70-74": 10,
+    "75-79": 11,
+    "80 or older": 12
+}
 
-# ── UI ───────────────────────────────────────────────────────────────────────
+ethnicity_map = {
+    "American Indian/Alaskan Native": 0,
+    "Asian": 1,
+    "Black": 2,
+    "Hispanic": 3,
+    "Other": 4,
+    "White": 5
+}
 
-st.title("🫀 Heart Disease Risk Predictor")
-st.markdown("Fill in the details below to estimate the likelihood of heart disease.")
+diabetic_map = {
+    "No": 0,
+    "No, borderline diabetes": 1,
+    "Yes": 2,
+    "Yes (during pregnancy)": 3
+}
 
-model = load_model()
+general_health_map = {
+    "Poor": 0,
+    "Fair": 1,
+    "Good": 2,
+    "Very good": 3,
+    "Excellent": 4
+}
 
-with st.form("prediction_form"):
-    st.subheader("Personal Information")
-    col1, col2, col3 = st.columns(3)
+# Inputs
+BMI = st.number_input("BMI", min_value=10.0, max_value=60.0, value=25.0, step=0.1)
+Smoking = yes_no_map[st.selectbox("Smoking", list(yes_no_map.keys()))]
+AlcoholDrinking = yes_no_map[st.selectbox("Alcohol Drinking", list(yes_no_map.keys()))]
+Stroke = yes_no_map[st.selectbox("Stroke", list(yes_no_map.keys()))]
+PhysicalHealth = st.number_input("Physical Health (days in last 30 days)", min_value=0.0, max_value=30.0, value=0.0, step=1.0)
+MentalHealth = st.number_input("Mental Health (days in last 30 days)", min_value=0.0, max_value=30.0, value=0.0, step=1.0)
+WalkingDifficulty = yes_no_map[st.selectbox("Walking Difficulty", list(yes_no_map.keys()))]
+Gender = gender_map[st.selectbox("Gender", list(gender_map.keys()))]
+AgeCategory = age_map[st.selectbox("Age Category", list(age_map.keys()))]
+Ethnicity = ethnicity_map[st.selectbox("Ethnicity", list(ethnicity_map.keys()))]
+Diabetic = diabetic_map[st.selectbox("Diabetic", list(diabetic_map.keys()))]
+PhysicalActivity = yes_no_map[st.selectbox("Physical Activity", list(yes_no_map.keys()))]
+GeneralHealth = general_health_map[st.selectbox("General Health", list(general_health_map.keys()))]
+SleepTime = st.number_input("Sleep Time (hours)", min_value=0.0, max_value=24.0, value=7.0, step=0.5)
+KidneyDisease = yes_no_map[st.selectbox("Kidney Disease", list(yes_no_map.keys()))]
 
-    with col1:
-        gender = st.selectbox("Gender", ["Male", "Female"])
-        age_cat = st.selectbox("Age Category", AGE_CATEGORIES, index=7)
-        ethnicity = st.selectbox("Ethnicity", ETHNICITIES, index=5)
+# DataFrame
+input_data = pd.DataFrame([{
+    "BMI": BMI,
+    "Smoking": Smoking,
+    "AlcoholDrinking": AlcoholDrinking,
+    "Stroke": Stroke,
+    "PhysicalHealth": PhysicalHealth,
+    "MentalHealth": MentalHealth,
+    "WalkingDifficulty": WalkingDifficulty,
+    "Gender": Gender,
+    "AgeCategory": AgeCategory,
+    "Ethnicity": Ethnicity,
+    "Diabetic": Diabetic,
+    "PhysicalActivity": PhysicalActivity,
+    "GeneralHealth": GeneralHealth,
+    "SleepTime": SleepTime,
+    "KidneyDisease": KidneyDisease
+}])
 
-    with col2:
-        bmi = st.number_input("BMI", min_value=10.0, max_value=100.0, value=25.0, step=0.1)
-        sleep_time = st.number_input("Average Sleep (hours/night)", min_value=1.0, max_value=24.0, value=7.0, step=0.5)
-        general_health = st.selectbox("General Health", GENERAL_HEALTH, index=3)
+# Prediction
+if st.button("Predict"):
+    prediction = model.predict(input_data)[0]
+    probability = model.predict_proba(input_data)[0][1]
 
-    with col3:
-        physical_health = st.slider("Poor Physical Health Days (last 30)", 0, 30, 0)
-        mental_health = st.slider("Poor Mental Health Days (last 30)", 0, 30, 0)
+    st.subheader("Prediction Result")
+    st.dataframe(input_data)
 
-    st.subheader("Medical History")
-    col4, col5, col6 = st.columns(3)
+    if prediction == 1:
+        st.error("Heart Disease Present")
+    else:
+        st.success("No Heart Disease")
 
-    with col4:
-        smoking = st.checkbox("Smoker (100+ cigarettes lifetime)")
-        alcohol = st.checkbox("Heavy Alcohol Drinker")
-        stroke = st.checkbox("Had a Stroke")
-
-    with col5:
-        diabetic = st.checkbox("Diabetic")
-        kidney_disease = st.checkbox("Kidney Disease")
-        walking_diff = st.checkbox("Difficulty Walking / Climbing Stairs")
-
-    with col6:
-        physical_activity = st.checkbox("Physically Active (last 30 days)", value=True)
-
-    submitted = st.form_submit_button("Predict Risk", use_container_width=True)
-
-if submitted:
-    input_df = encode_inputs(
-        bmi, smoking, alcohol, stroke, physical_health,
-        mental_health, walking_diff, gender, age_cat,
-        ethnicity, diabetic, physical_activity,
-        general_health, sleep_time, kidney_disease
-    )
-
-    prediction = model.predict(input_df)[0]
-    prob = model.predict_proba(input_df)[0][1]
-
-    st.divider()
-    col_r1, col_r2 = st.columns(2)
-
-    with col_r1:
-        if prediction == 1:
-            st.error(f"### ⚠️ Higher Risk Detected\nEstimated probability: **{prob*100:.1f}%**")
-        else:
-            st.success(f"### ✅ Lower Risk Detected\nEstimated probability: **{prob*100:.1f}%**")
-
-    with col_r2:
-        st.metric("Risk Score", f"{prob*100:.1f}%")
-        st.progress(float(prob))
-
-    st.caption("⚠️ This tool is for educational purposes only and is not a substitute for professional medical advice.")
+    st.write(f"Risk Probability: {probability:.4f}")
