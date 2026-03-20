@@ -5,10 +5,7 @@ import joblib
 import os
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-import anthropic
-
-# ✅ Add this AFTER all imports
-os.environ["ANTHROPIC_API_KEY"] = st.secrets["ANTHROPIC_API_KEY"]
+import google.generativeai as genai
 
 st.set_page_config(
     page_title="Heart Disease Predictor",
@@ -220,9 +217,10 @@ def encode_inputs(bmi, smoking, alcohol, stroke, physical_health,
         "KidneyDisease": int(kidney_disease),
     }])
 
-# ── AI Health Tips ────────────────────────────────────────────────────────────
+# ── AI Health Tips (Google Gemini - Free) ────────────────────────────────────
 def get_ai_health_tips(patient_data: dict, risk_score: float) -> str:
-    client = anthropic.Anthropic()
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    gemini = genai.GenerativeModel("gemini-1.5-flash")
 
     flags = []
     if patient_data["smoking"]:               flags.append("smoker")
@@ -260,15 +258,8 @@ Use these icons in order: 🏃 🥗 😴 🧘 💊
 Be warm, specific, and motivating. No generic advice.
 Output only the 5 lines — no intro, no outro, no extra text."""
 
-    full_response = ""
-    with client.messages.stream(
-        model="claude-sonnet-4-20250514",
-        max_tokens=600,
-        messages=[{"role": "user", "content": prompt}]
-    ) as stream:
-        for text in stream.text_stream:
-            full_response += text
-    return full_response
+    response = gemini.generate_content(prompt)
+    return response.text
 
 
 def render_tips_html(tips_text: str) -> str:
