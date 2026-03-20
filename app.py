@@ -1,3 +1,5 @@
+import os
+os.environ["ANTHROPIC_API_KEY"] = st.secrets["ANTHROPIC_API_KEY"]
 import streamlit as st
 import pandas as pd
 import numpy as np
