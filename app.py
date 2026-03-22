@@ -1324,8 +1324,7 @@ Be specific with numbers. Format with clear section headers."""
                     """, unsafe_allow_html=True)
 
                     # Parse sections and display nicely
-                    sections = analysis.split("
-")
+                    sections = analysis.split("\n")
                     formatted = ""
                     for line in sections:
                         line = line.strip()
