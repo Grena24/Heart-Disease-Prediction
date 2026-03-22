@@ -5,3 +5,4 @@ joblib
 matplotlib
 groq
 scikit-learn
+reportlab
