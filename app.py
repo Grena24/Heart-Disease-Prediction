@@ -918,7 +918,7 @@ with st.form("prediction_form"):
         walking_diff   = st.checkbox("Difficulty Walking")
 
     with col6:
-        physical_activity = st.checkbox("Physically Active (last 30 days)", value=True)
+        physical_activity = st.checkbox("Physically Active (last 30 days)")
 
     submitted = st.form_submit_button("🔍 Analyse Risk", use_container_width=True)
 
