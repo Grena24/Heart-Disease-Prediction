@@ -989,36 +989,30 @@ if submitted:
     st.divider()
     st.subheader("📄 Download Patient Report")
 
-    # Store tips in session for PDF (generated later)
-    if "last_tips" not in st.session_state:
-        st.session_state.last_tips = ""
+    pdf_bytes = generate_pdf_report(
+        name_display, gender, age_cat, bmi, sleep_time,
+        general_health, physical_health, mental_health,
+        smoking, alcohol, stroke, diabetic, kidney_disease,
+        walking_diff, physical_activity, prob, prediction,
+        st.session_state.get("last_tips", "")
+    )
+    filename = f"HeartRisk_{name_display.replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
 
-    pc1, pc2 = st.columns([3,1])
+    pc1, pc2 = st.columns([3, 1])
     with pc1:
         st.markdown(
-            "<p style='color:#888;font-size:13px;margin-top:8px'>Generate a professional PDF report "
-            "with patient info, risk score, medical history and AI health tips.</p>",
+            "<p style='color:#888;font-size:13px;margin-top:8px'>"
+            "Click the button to download a professional PDF report with patient info, "
+            "risk score, medical history and AI health tips.</p>",
             unsafe_allow_html=True)
     with pc2:
-        if st.button("⬇️ Generate & Download PDF", use_container_width=True, key="pdf_btn"):
-            with st.spinner("Building PDF report…"):
-                pdf_bytes = generate_pdf_report(
-                    name_display, gender, age_cat, bmi, sleep_time,
-                    general_health, physical_health, mental_health,
-                    smoking, alcohol, stroke, diabetic, kidney_disease,
-                    walking_diff, physical_activity, prob, prediction,
-                    st.session_state.get("last_tips", "")
-                )
-                b64 = base64.b64encode(pdf_bytes).decode()
-                filename = f"HeartRisk_{name_display.replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
-                href = f'''<a href="data:application/pdf;base64,{b64}"
-                              download="{filename}"
-                              style="display:inline-block;background:linear-gradient(135deg,#e63946,#c1121f);
-                                     color:white;padding:10px 22px;border-radius:8px;
-                                     text-decoration:none;font-weight:700;font-size:14px;
-                                     margin-top:4px;">
-                              📄 Click to Download PDF</a>'''
-                st.markdown(href, unsafe_allow_html=True)
+        st.download_button(
+            label="📄 Download PDF Report",
+            data=pdf_bytes,
+            file_name=filename,
+            mime="application/pdf",
+            use_container_width=True,
+        )
 
     # ── ✨ AI-Powered Personalised Health Tips ─────────────────────────────────
     st.divider()
