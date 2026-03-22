@@ -878,169 +878,487 @@ def generate_pdf_report(name, gender, age_cat, bmi, sleep_time, general_health,
     return buffer.read()
 
 # ── App ───────────────────────────────────────────────────────────────────────
-st.title("🫀 Heart Disease Risk Predictor")
+st.title("🫀 Heart Disease Predictor & Health Analyzer")
+st.caption("Early diagnosis support system powered by Machine Learning & AI")
 
 model = load_model()
 
-with st.form("prediction_form"):
-    st.subheader("Patient Details")
-    patient_name = st.text_input("Patient Name", placeholder="e.g. Rahul Sharma")
+tab1, tab2, tab3 = st.tabs(["🫀 Heart Disease Predictor", "🩺 Multi-Disease Risk", "🔬 Lab Report Analyzer"])
 
-    st.divider()
-    st.subheader("Personal Information")
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        gender    = st.selectbox("Gender", ["Male", "Female"])
-        age_cat   = st.selectbox("Age Category", AGE_CATEGORIES, index=7)
-        ethnicity = st.selectbox("Ethnicity", ETHNICITIES, index=5)
-
-    with col2:
-        bmi            = st.number_input("BMI", min_value=10.0, max_value=100.0, value=25.0, step=0.1)
-        sleep_time     = st.number_input("Avg Sleep (hrs/night)", min_value=1.0, max_value=24.0, value=7.0, step=0.5)
-        general_health = st.selectbox("General Health", GENERAL_HEALTH, index=3)
-
-    with col3:
-        physical_health = st.slider("Poor Physical Health Days (last 30)", 0, 30, 0)
-        mental_health   = st.slider("Poor Mental Health Days (last 30)", 0, 30, 0)
-
-    st.subheader("Medical History")
-    col4, col5, col6 = st.columns(3)
-
-    with col4:
-        smoking = st.checkbox("Smoker")
-        alcohol = st.checkbox("Heavy Alcohol Drinker")
-        stroke  = st.checkbox("Had a Stroke")
-
-    with col5:
-        diabetic       = st.checkbox("Diabetic")
-        kidney_disease = st.checkbox("Kidney Disease")
-        walking_diff   = st.checkbox("Difficulty Walking")
-
-    with col6:
-        physical_activity = st.checkbox("Physically Active (last 30 days)")
-
-    submitted = st.form_submit_button("🔍 Analyse Risk", use_container_width=True)
-
-# ── Results ───────────────────────────────────────────────────────────────────
-if submitted:
-    name_display = patient_name.strip() if patient_name.strip() else "Patient"
-
-    input_df = encode_inputs(
-        bmi, smoking, alcohol, stroke, physical_health,
-        mental_health, walking_diff, gender, age_cat,
-        ethnicity, diabetic, physical_activity,
-        general_health, sleep_time, kidney_disease
-    )
-
-    prediction = model.predict(input_df)[0]
-    prob       = model.predict_proba(input_df)[0][1]
-    gh_idx     = GENERAL_HEALTH.index(general_health)
-
-    # Patient header
-    st.markdown(f"""
-    <div class="patient-header">
-        <h2>📋 Report for {name_display}</h2>
-        <p>{gender} &nbsp;|&nbsp; Age: {age_cat} &nbsp;|&nbsp; BMI: {bmi}</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Verdict
-    if prediction == 1:
-        st.markdown(f"""
-        <div class="risk-high">
-            <b>⚠️ Higher Risk of Heart Disease Detected</b><br>
-            {name_display} shows indicators associated with heart disease risk. Please consult a cardiologist.
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown(f"""
-        <div class="risk-low">
-            <b>✅ Lower Risk of Heart Disease</b><br>
-            {name_display}'s profile suggests a lower risk. Continue maintaining a healthy lifestyle.
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.divider()
-
-    # Visualisations
-    v1, v2, v3 = st.columns(3)
-    with v1:
-        st.markdown('<p class="section-title">Risk Gauge</p>', unsafe_allow_html=True)
-        st.pyplot(gauge_chart(prob), use_container_width=True)
-    with v2:
-        st.markdown('<p class="section-title">Risk Factors Present</p>', unsafe_allow_html=True)
-        st.pyplot(risk_factor_bar(input_df), use_container_width=True)
-    with v3:
-        st.markdown('<p class="section-title">Health Profile Radar</p>', unsafe_allow_html=True)
-        st.pyplot(health_radar(physical_health, mental_health, bmi, sleep_time, gh_idx),
-                  use_container_width=True)
-
-    # Summary metrics
-    st.divider()
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Risk Score",      f"{prob*100:.1f}%")
-    m2.metric("BMI",             f"{bmi:.1f}")
-    m3.metric("Sleep",           f"{sleep_time} hrs")
-    m4.metric("Physical Health", f"{physical_health}/30 bad days")
+with tab1:
 
 
-    # ── 📄 PDF Report Download ────────────────────────────────────────────────
-    st.divider()
-    st.subheader("📄 Download Patient Report")
+    with st.form("prediction_form"):
+        st.subheader("Patient Details")
+        patient_name = st.text_input("Patient Name", placeholder="e.g. Rahul Sharma")
 
-    pdf_bytes = generate_pdf_report(
-        name_display, gender, age_cat, bmi, sleep_time,
-        general_health, physical_health, mental_health,
-        smoking, alcohol, stroke, diabetic, kidney_disease,
-        walking_diff, physical_activity, prob, prediction,
-        st.session_state.get("last_tips", "")
-    )
-    filename = f"HeartRisk_{name_display.replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        st.divider()
+        st.subheader("Personal Information")
+        col1, col2, col3 = st.columns(3)
 
-    pc1, pc2 = st.columns([3, 1])
-    with pc1:
-        st.markdown(
-            "<p style='color:#888;font-size:13px;margin-top:8px'>"
-            "Click the button to download a professional PDF report with patient info, "
-            "risk score, medical history and AI health tips.</p>",
-            unsafe_allow_html=True)
-    with pc2:
-        st.download_button(
-            label="📄 Download PDF Report",
-            data=pdf_bytes,
-            file_name=filename,
-            mime="application/pdf",
-            use_container_width=True,
+        with col1:
+            gender    = st.selectbox("Gender", ["Male", "Female"])
+            age_cat   = st.selectbox("Age Category", AGE_CATEGORIES, index=7)
+            ethnicity = st.selectbox("Ethnicity", ETHNICITIES, index=5)
+
+        with col2:
+            bmi            = st.number_input("BMI", min_value=10.0, max_value=100.0, value=25.0, step=0.1)
+            sleep_time     = st.number_input("Avg Sleep (hrs/night)", min_value=1.0, max_value=24.0, value=7.0, step=0.5)
+            general_health = st.selectbox("General Health", GENERAL_HEALTH, index=3)
+
+        with col3:
+            physical_health = st.slider("Poor Physical Health Days (last 30)", 0, 30, 0)
+            mental_health   = st.slider("Poor Mental Health Days (last 30)", 0, 30, 0)
+
+        st.subheader("Medical History")
+        col4, col5, col6 = st.columns(3)
+
+        with col4:
+            smoking = st.checkbox("Smoker")
+            alcohol = st.checkbox("Heavy Alcohol Drinker")
+            stroke  = st.checkbox("Had a Stroke")
+
+        with col5:
+            diabetic       = st.checkbox("Diabetic")
+            kidney_disease = st.checkbox("Kidney Disease")
+            walking_diff   = st.checkbox("Difficulty Walking")
+
+        with col6:
+            physical_activity = st.checkbox("Physically Active (last 30 days)")
+
+        submitted = st.form_submit_button("🔍 Analyse Risk", use_container_width=True)
+
+    # ── Results ───────────────────────────────────────────────────────────────────
+    if submitted:
+        name_display = patient_name.strip() if patient_name.strip() else "Patient"
+
+        input_df = encode_inputs(
+            bmi, smoking, alcohol, stroke, physical_health,
+            mental_health, walking_diff, gender, age_cat,
+            ethnicity, diabetic, physical_activity,
+            general_health, sleep_time, kidney_disease
         )
 
-    # ── ✨ AI-Powered Personalised Health Tips ─────────────────────────────────
-    st.divider()
+        prediction = model.predict(input_df)[0]
+        prob       = model.predict_proba(input_df)[0][1]
+        gh_idx     = GENERAL_HEALTH.index(general_health)
 
-    patient_data = dict(
-        bmi=bmi, smoking=smoking, alcohol=alcohol, stroke=stroke,
-        physical_health=physical_health, mental_health=mental_health,
-        walking_diff=walking_diff, gender=gender, age_cat=age_cat,
-        diabetic=diabetic, physical_activity=physical_activity,
-        general_health=general_health, sleep_time=sleep_time,
-        kidney_disease=kidney_disease,
-    )
+        # Patient header
+        st.markdown(f"""
+        <div class="patient-header">
+            <h2>📋 Report for {name_display}</h2>
+            <p>{gender} &nbsp;|&nbsp; Age: {age_cat} &nbsp;|&nbsp; BMI: {bmi}</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-    with st.spinner("✨ Generating personalised AI health tips…"):
-        try:
-            tips_text  = get_ai_health_tips(patient_data, prob)
-            cards_html = render_tips_html(tips_text)
+        # Verdict
+        if prediction == 1:
             st.markdown(f"""
-            <div class="ai-tips-container">
-                <span class="ai-tips-title">✨ AI-Powered Personalised Health Tips for {name_display}</span>
-                {cards_html}
-                <p class="disclaimer">
-                    ⚕️ These AI-generated tips are for informational purposes only and do not constitute
-                    medical advice. Always consult a qualified healthcare professional before making
-                    changes to your lifestyle or treatment plan.
-                </p>
+            <div class="risk-high">
+                <b>⚠️ Higher Risk of Heart Disease Detected</b><br>
+                {name_display} shows indicators associated with heart disease risk. Please consult a cardiologist.
             </div>
             """, unsafe_allow_html=True)
-            st.session_state.last_tips = tips_text
-        except Exception as e:
-            st.warning(f"Could not load AI tips: {e}")
+        else:
+            st.markdown(f"""
+            <div class="risk-low">
+                <b>✅ Lower Risk of Heart Disease</b><br>
+                {name_display}'s profile suggests a lower risk. Continue maintaining a healthy lifestyle.
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.divider()
+
+        # Visualisations
+        v1, v2, v3 = st.columns(3)
+        with v1:
+            st.markdown('<p class="section-title">Risk Gauge</p>', unsafe_allow_html=True)
+            st.pyplot(gauge_chart(prob), use_container_width=True)
+        with v2:
+            st.markdown('<p class="section-title">Risk Factors Present</p>', unsafe_allow_html=True)
+            st.pyplot(risk_factor_bar(input_df), use_container_width=True)
+        with v3:
+            st.markdown('<p class="section-title">Health Profile Radar</p>', unsafe_allow_html=True)
+            st.pyplot(health_radar(physical_health, mental_health, bmi, sleep_time, gh_idx),
+                      use_container_width=True)
+
+        # Summary metrics
+        st.divider()
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Risk Score",      f"{prob*100:.1f}%")
+        m2.metric("BMI",             f"{bmi:.1f}")
+        m3.metric("Sleep",           f"{sleep_time} hrs")
+        m4.metric("Physical Health", f"{physical_health}/30 bad days")
+
+
+        # ── 📄 PDF Report Download ────────────────────────────────────────────────
+        st.divider()
+        st.subheader("📄 Download Patient Report")
+
+        pdf_bytes = generate_pdf_report(
+            name_display, gender, age_cat, bmi, sleep_time,
+            general_health, physical_health, mental_health,
+            smoking, alcohol, stroke, diabetic, kidney_disease,
+            walking_diff, physical_activity, prob, prediction,
+            st.session_state.get("last_tips", "")
+        )
+        filename = f"HeartRisk_{name_display.replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+
+        pc1, pc2 = st.columns([3, 1])
+        with pc1:
+            st.markdown(
+                "<p style='color:#888;font-size:13px;margin-top:8px'>"
+                "Click the button to download a professional PDF report with patient info, "
+                "risk score, medical history and AI health tips.</p>",
+                unsafe_allow_html=True)
+        with pc2:
+            st.download_button(
+                label="📄 Download PDF Report",
+                data=pdf_bytes,
+                file_name=filename,
+                mime="application/pdf",
+                use_container_width=True,
+            )
+
+        # ── ✨ AI-Powered Personalised Health Tips ─────────────────────────────────
+        st.divider()
+
+        patient_data = dict(
+            bmi=bmi, smoking=smoking, alcohol=alcohol, stroke=stroke,
+            physical_health=physical_health, mental_health=mental_health,
+            walking_diff=walking_diff, gender=gender, age_cat=age_cat,
+            diabetic=diabetic, physical_activity=physical_activity,
+            general_health=general_health, sleep_time=sleep_time,
+            kidney_disease=kidney_disease,
+        )
+
+        with st.spinner("✨ Generating personalised AI health tips…"):
+            try:
+                tips_text  = get_ai_health_tips(patient_data, prob)
+                cards_html = render_tips_html(tips_text)
+                st.markdown(f"""
+                <div class="ai-tips-container">
+                    <span class="ai-tips-title">✨ AI-Powered Personalised Health Tips for {name_display}</span>
+                    {cards_html}
+                    <p class="disclaimer">
+                        ⚕️ These AI-generated tips are for informational purposes only and do not constitute
+                        medical advice. Always consult a qualified healthcare professional before making
+                        changes to your lifestyle or treatment plan.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                st.session_state.last_tips = tips_text
+            except Exception as e:
+                st.warning(f"Could not load AI tips: {e}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+with tab2:
+    st.subheader("🩺 Multi-Disease Risk Predictor")
+    st.caption("Predict your risk for Diabetes, Stroke and Kidney Disease simultaneously.")
+    st.divider()
+
+    with st.form("multi_form"):
+        st.subheader("Patient Details")
+        mc0a, mc0b = st.columns(2)
+        with mc0a:
+            m_name   = st.text_input("Patient Name", placeholder="e.g. Rahul Sharma", key="m_name")
+        with mc0b:
+            m_gender = st.selectbox("Gender", ["Male", "Female"], key="m_gender")
+
+        st.subheader("Personal Information")
+        mc1, mc2, mc3 = st.columns(3)
+        with mc1:
+            m_age_cat   = st.selectbox("Age Category", AGE_CATEGORIES, index=7, key="m_age")
+            m_gen_health= st.selectbox("General Health", GENERAL_HEALTH, index=3, key="m_gh")
+        with mc2:
+            m_bmi       = st.number_input("BMI", min_value=10.0, max_value=100.0, value=25.0, step=0.1, key="m_bmi")
+            m_sleep     = st.number_input("Avg Sleep (hrs/night)", min_value=1.0, max_value=24.0, value=7.0, step=0.5, key="m_sleep")
+        with mc3:
+            m_phys      = st.slider("Poor Physical Health Days (last 30)", 0, 30, 0, key="m_phys")
+            m_mental    = st.slider("Poor Mental Health Days (last 30)",   0, 30, 0, key="m_mental")
+
+        st.subheader("Medical History")
+        mc4, mc5, mc6 = st.columns(3)
+        with mc4:
+            m_smoking   = st.checkbox("Smoker",                key="m_smoke")
+            m_alcohol   = st.checkbox("Heavy Alcohol Drinker", key="m_alc")
+            m_stroke    = st.checkbox("Had a Stroke",          key="m_stroke")
+        with mc5:
+            m_diabetic  = st.checkbox("Diabetic",              key="m_diab")
+            m_kidney    = st.checkbox("Kidney Disease",        key="m_kidney")
+            m_walking   = st.checkbox("Difficulty Walking",    key="m_walk")
+        with mc6:
+            m_active    = st.checkbox("Physically Active (last 30 days)", key="m_active")
+
+        m_submitted = st.form_submit_button("🔍 Predict All Diseases", use_container_width=True)
+
+    if m_submitted:
+        m_name_display = m_name.strip() if m_name.strip() else "Patient"
+        m_age_idx = AGE_CATEGORIES.index(m_age_cat)
+        m_gh_idx  = GENERAL_HEALTH.index(m_gen_health)
+
+        # ── Scoring functions ──
+        def calc_diabetes(age_idx, bmi, phys, mental, smoking, alcohol, active, gh_idx, sleep):
+            s = age_idx*0.022
+            s += 0.28 if bmi>=30 else (0.14 if bmi>=25 else 0)
+            if not active:  s += 0.15
+            if smoking:     s += 0.10
+            if alcohol:     s += 0.06
+            s += (phys/30)*0.12 + (mental/30)*0.06
+            s += (4-gh_idx)*0.045
+            if sleep<6 or sleep>9: s += 0.07
+            return min(round(s,3), 1.0)
+
+        def calc_stroke(age_idx, bmi, smoking, alcohol, stroke_hist, phys, active, gh_idx, sleep, diabetic):
+            s = age_idx*0.030
+            s += 0.18 if bmi>=30 else (0.09 if bmi>=25 else 0)
+            if smoking:      s += 0.18
+            if alcohol:      s += 0.12
+            if stroke_hist:  s += 0.35
+            if diabetic:     s += 0.14
+            if not active:   s += 0.10
+            s += (phys/30)*0.10 + (4-gh_idx)*0.04
+            if sleep<6:      s += 0.08
+            return min(round(s,3), 1.0)
+
+        def calc_kidney(age_idx, bmi, diabetic, smoking, phys, gh_idx, sleep, alcohol, walking):
+            s = age_idx*0.025
+            if bmi>=30:     s += 0.15
+            if diabetic:    s += 0.30
+            if smoking:     s += 0.12
+            if alcohol:     s += 0.08
+            if walking:     s += 0.10
+            s += (phys/30)*0.12 + (4-gh_idx)*0.04
+            if sleep<6:     s += 0.06
+            return min(round(s,3), 1.0)
+
+        d_prob = calc_diabetes(m_age_idx, m_bmi, m_phys, m_mental, m_smoking, m_alcohol, m_active, m_gh_idx, m_sleep)
+        s_prob = calc_stroke(m_age_idx, m_bmi, m_smoking, m_alcohol, m_stroke, m_phys, m_active, m_gh_idx, m_sleep, m_diabetic)
+        k_prob = calc_kidney(m_age_idx, m_bmi, m_diabetic, m_smoking, m_phys, m_gh_idx, m_sleep, m_alcohol, m_walking)
+
+        def risk_badge(p):
+            if p>=0.60:   return "🔴 High Risk",   "#e63946"
+            elif p>=0.35: return "🟡 Medium Risk",  "#f4a261"
+            else:         return "🟢 Low Risk",     "#52b788"
+
+        # ── Patient banner ──
+        st.markdown(f"""
+        <div style="background:linear-gradient(135deg,#1a0a2e,#0f0f1a);border:1px solid #2a1a4a;
+                    border-radius:12px;padding:18px 24px;margin-bottom:18px;">
+            <h3 style="margin:0;color:#f0f0f0">📋 Multi-Disease Report for {m_name_display}</h3>
+            <p style="margin:4px 0 0;color:#888;font-size:13px">{m_gender} &nbsp;|&nbsp; Age: {m_age_cat} &nbsp;|&nbsp; BMI: {m_bmi}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ── 4 disease cards ──
+        dc1, dc2, dc3 = st.columns(3)
+        diseases = [
+            ("🩸 Diabetes",      d_prob, dc1),
+            ("🧠 Stroke",        s_prob, dc2),
+            ("🫘 Kidney Disease",k_prob, dc3),
+        ]
+        for dname, dprob, dcol in diseases:
+            label, color, _, _ = (
+                ("High Risk",   "#e63946", "", "") if dprob>=0.60 else
+                ("Medium Risk", "#f4a261", "", "") if dprob>=0.35 else
+                ("Low Risk",    "#52b788", "", "")
+            )
+            with dcol:
+                st.markdown(f"""
+                <div style="background:#111;border:1px solid #222;border-left:5px solid {color};
+                            border-radius:12px;padding:18px 20px;margin-bottom:8px;">
+                    <div style="font-size:15px;font-weight:700;color:#f0f0f0">{dname}</div>
+                    <div style="font-size:34px;font-weight:900;color:{color};line-height:1.2">{dprob*100:.1f}%</div>
+                    <div style="font-size:12px;color:#888;margin-top:2px">{label}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # ── Comparison chart ──
+        st.divider()
+        fig, ax = plt.subplots(figsize=(9, 2.8))
+        fig.patch.set_facecolor("#0d0d0d")
+        ax.set_facecolor("#0d0d0d")
+        d_names = ["🩸 Diabetes", "🧠 Stroke", "🫘 Kidney"]
+        d_probs = [d_prob*100, s_prob*100, k_prob*100]
+        d_colors= ["#e63946" if p>=60 else "#f4a261" if p>=35 else "#52b788" for p in d_probs]
+        bars = ax.barh(d_names, d_probs, color=d_colors, height=0.4, edgecolor="none")
+        ax.set_xlim(0, 108)
+        ax.axvline(35, color="#333", lw=0.8, ls="--")
+        ax.axvline(60, color="#333", lw=0.8, ls="--")
+        for bar, val in zip(bars, d_probs):
+            ax.text(val+1.5, bar.get_y()+bar.get_height()/2, f"{val:.1f}%",
+                    va="center", fontsize=10, color="#e8e8e8", fontweight="700")
+        ax.set_xlabel("Risk Score (%)", color="#aaa", fontsize=10)
+        ax.tick_params(axis="y", labelsize=11, colors="#ccc")
+        ax.tick_params(axis="x", colors="#777")
+        ax.spines["bottom"].set_color("#333")
+        ax.spines["left"].set_color("#333")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.set_title("Multi-Disease Risk Comparison", color="#f0f0f0", fontsize=13, fontweight="700", pad=10)
+        plt.tight_layout(pad=0.8)
+        st.pyplot(fig, use_container_width=True)
+
+        # ── Summary metrics ──
+        st.divider()
+        sm1, sm2, sm3, sm4 = st.columns(4)
+        overall = round((d_prob + s_prob + k_prob) / 3 * 100, 1)
+        highest = max([(d_prob,"Diabetes"),(s_prob,"Stroke"),(k_prob,"Kidney")], key=lambda x: x[0])
+        sm1.metric("Overall Avg Risk",  f"{overall}%")
+        sm2.metric("Highest Risk",      highest[1])
+        sm3.metric("BMI",               f"{m_bmi:.1f}")
+        sm4.metric("Sleep",             f"{m_sleep} hrs")
+
+        # ── AI tips ──
+        st.divider()
+        with st.spinner("✨ Generating multi-disease prevention tips…"):
+            try:
+                client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+                prompt = f"""You are a preventive medicine specialist.
+Patient: {m_name_display}, {m_gender}, Age: {m_age_cat}, BMI: {m_bmi:.1f}
+Risk Scores — Diabetes: {d_prob*100:.1f}%, Stroke: {s_prob*100:.1f}%, Kidney: {k_prob*100:.1f}%
+Smoker: {"Yes" if m_smoking else "No"}, Diabetic: {"Yes" if m_diabetic else "No"}
+
+Give 4 specific prevention tips for the highest risk conditions.
+Format: ICON | **Title** | One sentence. Icons: 🩸 🧠 🫘 🏃
+Only 4 lines, no intro/outro."""
+                resp = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[{"role":"user","content":prompt}],
+                    max_tokens=400,
+                )
+                tips = resp.choices[0].message.content
+                lines = [l.strip() for l in tips.strip().split("\n") if l.strip()]
+                cards = ""
+                for line in lines:
+                    parts = line.split("|", 2)
+                    if len(parts)==3:
+                        cards += f'''<div class="tip-card"><span style="font-size:18px">{parts[0].strip()}</span> <b>{parts[1].strip().strip("**").strip("*")}</b><br>{parts[2].strip()}</div>'''
+                    else:
+                        cards += f'''<div class="tip-card">{line}</div>'''
+                st.markdown(f'''
+                <div class="ai-tips-container">
+                    <span class="ai-tips-title">✨ Multi-Disease Prevention Tips for {m_name_display}</span>
+                    {cards}
+                    <p class="disclaimer">⚕️ For informational purposes only. Consult a healthcare professional.</p>
+                </div>''', unsafe_allow_html=True)
+            except Exception as e:
+                st.warning(f"Could not load tips: {e}")
+
+# ─────────────────────────────────────────────────────────────────────────────
+with tab3:
+    st.subheader("🔬 Lab Report Analyzer")
+    st.caption("Upload your blood test report and get an AI-powered health analysis.")
+    st.divider()
+
+    uploaded_file = st.file_uploader(
+        "📁 Upload Lab Report (PDF or Image — JPG, PNG)",
+        type=["pdf", "jpg", "jpeg", "png"],
+        help="Upload a scanned blood test or lab report"
+    )
+
+    if uploaded_file:
+        file_type = uploaded_file.type
+        st.success(f"✅ File uploaded: **{uploaded_file.name}**")
+
+        analyze_btn = st.button("🔬 Analyze Lab Report", use_container_width=False, key="lab_btn")
+
+        if analyze_btn:
+            with st.spinner("🔬 AI is reading your lab report…"):
+                try:
+                    import base64 as b64lib
+                    file_bytes = uploaded_file.read()
+                    b64_data   = b64lib.b64encode(file_bytes).decode("utf-8")
+
+                    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+
+                    if "pdf" in file_type:
+                        # For PDF — send as text extraction request
+                        prompt_content = """You are a medical lab report analyst.
+The user has uploaded a lab report PDF. Based on common blood test parameters,
+analyze the report and provide:
+1. KEY FINDINGS — list abnormal or borderline values found
+2. RISK INDICATORS — what diseases or conditions these values suggest
+3. NORMAL VALUES — parameters that are within healthy range
+4. RECOMMENDATIONS — 4 specific actionable tips based on findings
+
+Format clearly with these exact section headers.
+If you cannot read specific values, provide general guidance on what to look for."""
+                        messages = [{"role": "user", "content": prompt_content}]
+                    else:
+                        # For image — use vision
+                        prompt_content = [
+                            {
+                                "type": "text",
+                                "text": """You are a medical lab report analyst. Analyze this blood test report image and provide:
+1. KEY FINDINGS — list all test parameters with their values and normal ranges
+2. ABNORMAL VALUES — highlight values outside normal range (mark HIGH or LOW)
+3. RISK INDICATORS — what health conditions these values may suggest
+4. RECOMMENDATIONS — 4 specific actionable health tips based on the findings
+
+Be specific with numbers. Format with clear section headers."""
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:{file_type};base64,{b64_data}"}
+                            }
+                        ]
+                        messages = [{"role": "user", "content": prompt_content}]
+
+                    resp = client.chat.completions.create(
+                        model="llama-3.3-70b-versatile" if "pdf" in file_type else "llama-3.2-11b-vision-preview",
+                        messages=messages,
+                        max_tokens=1200,
+                    )
+                    analysis = resp.choices[0].message.content
+
+                    # ── Display results ──
+                    st.markdown(f"""
+                    <div style="background:#0f0f1a;border:1px solid #2a2a4a;border-radius:14px;padding:24px 28px;margin-top:8px;">
+                        <span style="font-size:17px;font-weight:700;background:linear-gradient(90deg,#60a5fa,#a78bfa);
+                              -webkit-background-clip:text;-webkit-text-fill-color:transparent;display:block;margin-bottom:16px;">
+                            🔬 Lab Report Analysis — {uploaded_file.name}
+                        </span>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    # Parse sections and display nicely
+                    sections = analysis.split("
+")
+                    formatted = ""
+                    for line in sections:
+                        line = line.strip()
+                        if not line:
+                            formatted += "<br>"
+                        elif any(h in line.upper() for h in ["KEY FINDINGS","ABNORMAL","RISK INDICATORS","RECOMMENDATIONS","NORMAL VALUES"]):
+                            formatted += f"<p style='color:#a78bfa;font-weight:700;font-size:14px;margin-top:14px;margin-bottom:4px'>{line}</p>"
+                        elif line.startswith(("-","•","*","1.","2.","3.","4.","5.")):
+                            formatted += f"<p style='color:#d4d4e8;font-size:13px;margin:3px 0;padding-left:10px'>{line}</p>"
+                        else:
+                            formatted += f"<p style='color:#cccccc;font-size:13px;margin:3px 0'>{line}</p>"
+
+                    st.markdown(f"""
+                    <div style="background:#0d0d1a;border:1px solid #1e1e3a;border-radius:10px;
+                                padding:20px 24px;margin-top:4px;">
+                        {formatted}
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    st.markdown("""
+                    <p style='font-size:11px;color:#555;margin-top:14px;font-style:italic'>
+                    ⚕️ This AI analysis is for informational purposes only and does not constitute medical advice.
+                    Always consult a qualified doctor for diagnosis and treatment.
+                    </p>""", unsafe_allow_html=True)
+
+                except Exception as e:
+                    st.error(f"Could not analyze report: {e}")
+    else:
+        st.markdown("""
+        <div style="background:#111;border:2px dashed #2a2a2a;border-radius:12px;
+                    padding:40px;text-align:center;margin-top:10px;">
+            <div style="font-size:40px;margin-bottom:12px">🔬</div>
+            <p style="color:#666;font-size:14px">Upload a blood test PDF or image to get started</p>
+            <p style="color:#444;font-size:12px">Supports: CBC, LFT, KFT, Lipid Profile, Blood Sugar, Thyroid reports</p>
+        </div>
+        """, unsafe_allow_html=True)
