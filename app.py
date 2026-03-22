@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import json
 from datetime import datetime
 import numpy as np
 import joblib
@@ -8,6 +7,14 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from groq import Groq
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+import io
+import base64
 
 st.set_page_config(
     page_title="Heart Disease Predictor",
@@ -153,6 +160,35 @@ st.markdown("""
     }
     .tip-card b { color: #a78bfa; }
 
+    /* ── AI Tips Panel ── */
+    .ai-tips-container {
+        background: linear-gradient(145deg, #0f0f1a, #111122);
+        border: 1px solid #2a2a4a;
+        border-radius: 14px;
+        padding: 24px 28px;
+        margin-top: 8px;
+    }
+    .ai-tips-title {
+        font-size: 18px;
+        font-weight: 700;
+        background: linear-gradient(90deg, #a78bfa, #e63946);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 18px;
+        display: block;
+    }
+    .tip-card {
+        background: #16162a;
+        border: 1px solid #2a2a4a;
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+        color: #d4d4e8;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+    .tip-card b { color: #a78bfa; }
+
     /* ── Patient History Table ── */
     .history-container {
         background: #0f0f0f;
@@ -215,70 +251,250 @@ st.markdown("""
         font-style: italic;
     }
 
-    /* ── What-If Simulator ── */
-    .simulator-container {
-        background: linear-gradient(160deg, #0a0a14, #0f0f1e);
-        border: 1px solid #1e1e3a;
-        border-radius: 16px;
-        padding: 28px 32px;
+    /* ── Patient History Table ── */
+    .history-container {
+        background: #0f0f0f;
+        border: 1px solid #2a2a2a;
+        border-radius: 14px;
+        padding: 22px 26px;
         margin-top: 8px;
     }
-    .simulator-title {
-        font-size: 20px;
-        font-weight: 800;
-        background: linear-gradient(90deg, #60a5fa, #a78bfa, #e63946);
+    .history-title {
+        font-size: 17px;
+        font-weight: 700;
+        color: #f0f0f0 !important;
+        margin-bottom: 16px;
+        display: block;
+    }
+    .history-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #161616;
+        border: 1px solid #222;
+        border-radius: 8px;
+        padding: 10px 16px;
+        margin-bottom: 8px;
+        font-size: 13px;
+        color: #cccccc;
+    }
+    .history-row:hover { border-color: #444; }
+    .badge-high {
+        background: #3a0a0a;
+        color: #e63946;
+        border: 1px solid #e63946;
+        border-radius: 20px;
+        padding: 2px 10px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .badge-low {
+        background: #0a3a1a;
+        color: #52b788;
+        border: 1px solid #52b788;
+        border-radius: 20px;
+        padding: 2px 10px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .clear-btn button {
+        background: #1a1a1a !important;
+        color: #e63946 !important;
+        border: 1px solid #e63946 !important;
+        border-radius: 6px !important;
+        font-size: 12px !important;
+        padding: 4px 14px !important;
+    }
+
+    .disclaimer {
+        font-size: 11px;
+        color: #555 !important;
+        margin-top: 14px;
+        font-style: italic;
+    }
+
+    /* ── AI Tips Panel ── */
+    .ai-tips-container {
+        background: linear-gradient(145deg, #0f0f1a, #111122);
+        border: 1px solid #2a2a4a;
+        border-radius: 14px;
+        padding: 24px 28px;
+        margin-top: 8px;
+    }
+    .ai-tips-title {
+        font-size: 18px;
+        font-weight: 700;
+        background: linear-gradient(90deg, #a78bfa, #e63946);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        display: block;
-        margin-bottom: 6px;
-    }
-    .simulator-subtitle {
-        font-size: 13px;
-        color: #666 !important;
-        margin-bottom: 22px;
+        margin-bottom: 18px;
         display: block;
     }
-    .sim-result-box {
-        background: #0d0d1a;
+    .tip-card {
+        background: #16162a;
         border: 1px solid #2a2a4a;
-        border-radius: 12px;
-        padding: 20px 24px;
-        text-align: center;
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+        color: #d4d4e8;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+    .tip-card b { color: #a78bfa; }
+
+    /* ── AI Tips Panel ── */
+    .ai-tips-container {
+        background: linear-gradient(145deg, #0f0f1a, #111122);
+        border: 1px solid #2a2a4a;
+        border-radius: 14px;
+        padding: 24px 28px;
         margin-top: 8px;
     }
-    .sim-orig-score {
+    .ai-tips-title {
+        font-size: 18px;
+        font-weight: 700;
+        background: linear-gradient(90deg, #a78bfa, #e63946);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 18px;
+        display: block;
+    }
+    .tip-card {
+        background: #16162a;
+        border: 1px solid #2a2a4a;
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+        color: #d4d4e8;
         font-size: 14px;
-        color: #888 !important;
-        margin-bottom: 4px;
+        line-height: 1.6;
     }
-    .sim-new-score {
-        font-size: 42px;
-        font-weight: 900;
-        color: #60a5fa;
-        line-height: 1.1;
+    .tip-card b { color: #a78bfa; }
+
+    /* ── Patient History Table ── */
+    .history-container {
+        background: #0f0f0f;
+        border: 1px solid #2a2a2a;
+        border-radius: 14px;
+        padding: 22px 26px;
+        margin-top: 8px;
     }
-    .sim-drop-positive {
-        font-size: 18px;
+    .history-title {
+        font-size: 17px;
         font-weight: 700;
-        color: #52b788 !important;
-        margin-top: 6px;
+        color: #f0f0f0 !important;
+        margin-bottom: 16px;
+        display: block;
     }
-    .sim-drop-negative {
-        font-size: 18px;
-        font-weight: 700;
-        color: #e63946 !important;
-        margin-top: 6px;
-    }
-    .sim-insight {
-        background: #12121f;
-        border-left: 3px solid #60a5fa;
-        border-radius: 6px;
-        padding: 10px 14px;
-        margin-top: 10px;
+    .history-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #161616;
+        border: 1px solid #222;
+        border-radius: 8px;
+        padding: 10px 16px;
+        margin-bottom: 8px;
         font-size: 13px;
-        color: #b0b8d0 !important;
-        text-align: left;
+        color: #cccccc;
     }
+    .history-row:hover { border-color: #444; }
+    .badge-high {
+        background: #3a0a0a;
+        color: #e63946;
+        border: 1px solid #e63946;
+        border-radius: 20px;
+        padding: 2px 10px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .badge-low {
+        background: #0a3a1a;
+        color: #52b788;
+        border: 1px solid #52b788;
+        border-radius: 20px;
+        padding: 2px 10px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .clear-btn button {
+        background: #1a1a1a !important;
+        color: #e63946 !important;
+        border: 1px solid #e63946 !important;
+        border-radius: 6px !important;
+        font-size: 12px !important;
+        padding: 4px 14px !important;
+    }
+
+    .disclaimer {
+        font-size: 11px;
+        color: #555 !important;
+        margin-top: 14px;
+        font-style: italic;
+    }
+
+    /* ── Patient History Table ── */
+    .history-container {
+        background: #0f0f0f;
+        border: 1px solid #2a2a2a;
+        border-radius: 14px;
+        padding: 22px 26px;
+        margin-top: 8px;
+    }
+    .history-title {
+        font-size: 17px;
+        font-weight: 700;
+        color: #f0f0f0 !important;
+        margin-bottom: 16px;
+        display: block;
+    }
+    .history-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #161616;
+        border: 1px solid #222;
+        border-radius: 8px;
+        padding: 10px 16px;
+        margin-bottom: 8px;
+        font-size: 13px;
+        color: #cccccc;
+    }
+    .history-row:hover { border-color: #444; }
+    .badge-high {
+        background: #3a0a0a;
+        color: #e63946;
+        border: 1px solid #e63946;
+        border-radius: 20px;
+        padding: 2px 10px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .badge-low {
+        background: #0a3a1a;
+        color: #52b788;
+        border: 1px solid #52b788;
+        border-radius: 20px;
+        padding: 2px 10px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .clear-btn button {
+        background: #1a1a1a !important;
+        color: #e63946 !important;
+        border: 1px solid #e63946 !important;
+        border-radius: 6px !important;
+        font-size: 12px !important;
+        padding: 4px 14px !important;
+    }
+
+    .disclaimer {
+        font-size: 11px;
+        color: #555 !important;
+        margin-top: 14px;
+        font-style: italic;
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -404,43 +620,6 @@ def render_tips_html(tips_text: str) -> str:
 
 
 
-# ── What-If Simulator ─────────────────────────────────────────────────────────
-def whatif_chart(original_prob, scenarios):
-    """Bar chart comparing original risk vs what-if scenarios."""
-    fig, ax = plt.subplots(figsize=(8, 3.8))
-    fig.patch.set_facecolor("#0d0d0d")
-    ax.set_facecolor("#0d0d0d")
-
-    labels = ["Current"] + [s["label"] for s in scenarios]
-    values = [original_prob * 100] + [s["prob"] * 100 for s in scenarios]
-    colors = []
-    for i, v in enumerate(values):
-        if i == 0:
-            colors.append("#555577")
-        elif v < original_prob * 100:
-            colors.append("#52b788")
-        else:
-            colors.append("#e63946")
-
-    bars = ax.barh(labels, values, color=colors, height=0.5, edgecolor="none")
-    ax.set_xlim(0, 105)
-    ax.axvline(50, color="#444", linewidth=0.8, linestyle="--")
-    ax.text(51, -0.6, "50%", fontsize=8, color="#555")
-
-    for bar, val in zip(bars, values):
-        ax.text(val + 1.2, bar.get_y() + bar.get_height()/2,
-                f"{val:.1f}%", va="center", fontsize=9,
-                color="#e8e8e8", fontweight="600")
-
-    ax.set_xlabel("Predicted Risk Score (%)", color="#aaaaaa", fontsize=10)
-    ax.tick_params(axis="y", labelsize=10, colors="#cccccc")
-    ax.tick_params(axis="x", colors="#777777")
-    ax.spines["bottom"].set_color("#333")
-    ax.spines["left"].set_color("#333")
-    ax.set_title("What-If: How Lifestyle Changes Affect Your Risk",
-                 color="#f0f0f0", fontsize=12, fontweight="700", pad=12)
-    plt.tight_layout(pad=0.8)
-    return fig
 
 # ── Charts ────────────────────────────────────────────────────────────────────
 BG = "#0d0d0d"
@@ -535,6 +714,168 @@ def health_radar(physical_health, mental_health, bmi, sleep_time, general_health
     ax.fill(angles, values, color="#e63946", alpha=0.30)
     plt.tight_layout(pad=0.5)
     return fig
+
+
+# ── PDF Report Generator ──────────────────────────────────────────────────────
+def generate_pdf_report(name, gender, age_cat, bmi, sleep_time, general_health,
+                        physical_health, mental_health, smoking, alcohol, stroke,
+                        diabetic, kidney_disease, walking_diff, physical_activity,
+                        prob, prediction, tips_text=""):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            rightMargin=2*cm, leftMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2*cm)
+
+    styles = getSampleStyleSheet()
+    story  = []
+
+    # ── Title styles ──
+    title_style = ParagraphStyle("title", fontSize=22, fontName="Helvetica-Bold",
+                                 textColor=colors.HexColor("#c1121f"),
+                                 spaceAfter=4, alignment=TA_CENTER)
+    sub_style   = ParagraphStyle("sub", fontSize=10, fontName="Helvetica",
+                                 textColor=colors.HexColor("#555555"),
+                                 spaceAfter=2, alignment=TA_CENTER)
+    section_style = ParagraphStyle("section", fontSize=12, fontName="Helvetica-Bold",
+                                   textColor=colors.HexColor("#1a1a1a"),
+                                   spaceBefore=14, spaceAfter=6)
+    body_style  = ParagraphStyle("body", fontSize=10, fontName="Helvetica",
+                                 textColor=colors.HexColor("#333333"),
+                                 spaceAfter=4, leading=16)
+    tip_style   = ParagraphStyle("tip", fontSize=9.5, fontName="Helvetica",
+                                 textColor=colors.HexColor("#2d2d2d"),
+                                 leftIndent=10, spaceAfter=5, leading=15)
+
+    # ── Header ──
+    story.append(Paragraph("🫀 Heart Disease Risk Report", title_style))
+    story.append(Paragraph(f"Generated on {datetime.now().strftime('%d %B %Y, %I:%M %p')}", sub_style))
+    story.append(HRFlowable(width="100%", thickness=1.5,
+                             color=colors.HexColor("#c1121f"), spaceAfter=16))
+
+    # ── Patient Info Table ──
+    story.append(Paragraph("Patient Information", section_style))
+    info_data = [
+        ["Full Name",      name,          "Gender",       gender],
+        ["Age Group",      age_cat,       "BMI",          f"{bmi:.1f}"],
+        ["Sleep (hrs)",    f"{sleep_time}","Gen. Health",  general_health],
+        ["Phys. Bad Days", str(physical_health), "Mental Bad Days", str(mental_health)],
+    ]
+    info_table = Table(info_data, colWidths=[3.8*cm, 5.5*cm, 3.8*cm, 5.5*cm])
+    info_table.setStyle(TableStyle([
+        ("BACKGROUND",  (0,0), (0,-1), colors.HexColor("#f5f5f5")),
+        ("BACKGROUND",  (2,0), (2,-1), colors.HexColor("#f5f5f5")),
+        ("FONTNAME",    (0,0), (0,-1), "Helvetica-Bold"),
+        ("FONTNAME",    (2,0), (2,-1), "Helvetica-Bold"),
+        ("FONTSIZE",    (0,0), (-1,-1), 9.5),
+        ("TEXTCOLOR",   (0,0), (0,-1), colors.HexColor("#555555")),
+        ("TEXTCOLOR",   (2,0), (2,-1), colors.HexColor("#555555")),
+        ("TEXTCOLOR",   (1,0), (1,-1), colors.HexColor("#111111")),
+        ("TEXTCOLOR",   (3,0), (3,-1), colors.HexColor("#111111")),
+        ("GRID",        (0,0), (-1,-1), 0.4, colors.HexColor("#dddddd")),
+        ("ROWBACKGROUND",(0,0),(-1,-1), [colors.white, colors.HexColor("#fafafa")]),
+        ("PADDING",     (0,0), (-1,-1), 7),
+        ("VALIGN",      (0,0), (-1,-1), "MIDDLE"),
+    ]))
+    story.append(info_table)
+    story.append(Spacer(1, 10))
+
+    # ── Medical History ──
+    story.append(Paragraph("Medical History", section_style))
+    def yn(val): return "Yes" if val else "No"
+    def yn_color(val): return colors.HexColor("#b91c1c") if val else colors.HexColor("#15803d")
+
+    med_data = [
+        ["Condition", "Status", "Condition", "Status"],
+        ["Smoker",           yn(smoking),          "Diabetic",          yn(diabetic)],
+        ["Heavy Alcohol",    yn(alcohol),           "Kidney Disease",    yn(kidney_disease)],
+        ["History of Stroke",yn(stroke),            "Difficulty Walking",yn(walking_diff)],
+        ["Physically Active",yn(physical_activity), "",                  ""],
+    ]
+    med_table = Table(med_data, colWidths=[5*cm, 3.3*cm, 5*cm, 3.3*cm])
+    med_style = TableStyle([
+        ("BACKGROUND",  (0,0), (-1,0), colors.HexColor("#c1121f")),
+        ("TEXTCOLOR",   (0,0), (-1,0), colors.white),
+        ("FONTNAME",    (0,0), (-1,0), "Helvetica-Bold"),
+        ("FONTSIZE",    (0,0), (-1,-1), 9.5),
+        ("GRID",        (0,0), (-1,-1), 0.4, colors.HexColor("#dddddd")),
+        ("PADDING",     (0,0), (-1,-1), 7),
+        ("VALIGN",      (0,0), (-1,-1), "MIDDLE"),
+        ("ALIGN",       (1,0), (1,-1), "CENTER"),
+        ("ALIGN",       (3,0), (3,-1), "CENTER"),
+    ])
+    # Colour Yes/No cells
+    flags = [(smoking,1,1),(alcohol,1,2),(stroke,1,3),(physical_activity,1,4),
+             (diabetic,3,1),(kidney_disease,3,2),(walking_diff,3,3)]
+    for val, col, row in flags:
+        med_style.add("TEXTCOLOR", (col,row), (col,row), yn_color(val))
+        med_style.add("FONTNAME",  (col,row), (col,row), "Helvetica-Bold")
+    med_table.setStyle(med_style)
+    story.append(med_table)
+    story.append(Spacer(1, 10))
+
+    # ── Risk Result ──
+    story.append(HRFlowable(width="100%", thickness=0.5,
+                             color=colors.HexColor("#dddddd"), spaceAfter=10))
+    story.append(Paragraph("Prediction Result", section_style))
+
+    risk_pct   = f"{prob*100:.1f}%"
+    risk_label = "⚠ HIGHER RISK DETECTED" if prediction == 1 else "✓ LOWER RISK"
+    risk_color = colors.HexColor("#c1121f") if prediction == 1 else colors.HexColor("#15803d")
+    risk_bg    = colors.HexColor("#fff0f0") if prediction == 1 else colors.HexColor("#f0fff4")
+
+    result_data = [["Risk Score", "Verdict"],
+                   [risk_pct,     risk_label]]
+    result_table = Table(result_data, colWidths=[8.3*cm, 8.3*cm])
+    result_table.setStyle(TableStyle([
+        ("BACKGROUND",  (0,0), (-1,0), colors.HexColor("#1a1a1a")),
+        ("TEXTCOLOR",   (0,0), (-1,0), colors.white),
+        ("FONTNAME",    (0,0), (-1,0), "Helvetica-Bold"),
+        ("BACKGROUND",  (0,1), (-1,1), risk_bg),
+        ("TEXTCOLOR",   (0,1), (0,1),  colors.HexColor("#111111")),
+        ("TEXTCOLOR",   (1,1), (1,1),  risk_color),
+        ("FONTNAME",    (0,1), (-1,1), "Helvetica-Bold"),
+        ("FONTSIZE",    (0,1), (0,1),  28),
+        ("FONTSIZE",    (1,1), (1,1),  13),
+        ("ALIGN",       (0,0), (-1,-1),"CENTER"),
+        ("VALIGN",      (0,0), (-1,-1),"MIDDLE"),
+        ("GRID",        (0,0), (-1,-1), 0.4, colors.HexColor("#dddddd")),
+        ("PADDING",     (0,0), (-1,-1), 12),
+        ("ROWHEIGHT",   (0,1), (-1,1),  52),
+    ]))
+    story.append(result_table)
+    story.append(Spacer(1, 10))
+
+    # ── AI Tips ──
+    if tips_text.strip():
+        story.append(HRFlowable(width="100%", thickness=0.5,
+                                 color=colors.HexColor("#dddddd"), spaceAfter=10))
+        story.append(Paragraph("AI-Powered Health Recommendations", section_style))
+        lines = [l.strip() for l in tips_text.strip().split("\n") if l.strip()]
+        for line in lines:
+            parts = line.split("|", 2)
+            if len(parts) == 3:
+                icon   = parts[0].strip()
+                title  = parts[1].strip().strip("**").strip("*")
+                advice = parts[2].strip()
+                story.append(Paragraph(f"<b>{icon} {title}</b>", tip_style))
+                story.append(Paragraph(f"&nbsp;&nbsp;&nbsp;{advice}", tip_style))
+            else:
+                story.append(Paragraph(line, tip_style))
+        story.append(Spacer(1, 6))
+
+    # ── Footer ──
+    story.append(HRFlowable(width="100%", thickness=0.5,
+                             color=colors.HexColor("#dddddd"), spaceBefore=14, spaceAfter=6))
+    footer_style = ParagraphStyle("footer", fontSize=8, fontName="Helvetica",
+                                  textColor=colors.HexColor("#999999"), alignment=TA_CENTER)
+    story.append(Paragraph(
+        "This report is generated by the Heart Disease Risk Predictor using a Machine Learning model. "
+        "It is for informational purposes only and does not constitute medical advice. "
+        "Always consult a qualified healthcare professional.", footer_style))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.read()
 
 # ── App ───────────────────────────────────────────────────────────────────────
 st.title("🫀 Heart Disease Risk Predictor")
@@ -643,6 +984,42 @@ if submitted:
     m3.metric("Sleep",           f"{sleep_time} hrs")
     m4.metric("Physical Health", f"{physical_health}/30 bad days")
 
+
+    # ── 📄 PDF Report Download ────────────────────────────────────────────────
+    st.divider()
+    st.subheader("📄 Download Patient Report")
+
+    # Store tips in session for PDF (generated later)
+    if "last_tips" not in st.session_state:
+        st.session_state.last_tips = ""
+
+    pc1, pc2 = st.columns([3,1])
+    with pc1:
+        st.markdown(
+            "<p style='color:#888;font-size:13px;margin-top:8px'>Generate a professional PDF report "
+            "with patient info, risk score, medical history and AI health tips.</p>",
+            unsafe_allow_html=True)
+    with pc2:
+        if st.button("⬇️ Generate & Download PDF", use_container_width=True, key="pdf_btn"):
+            with st.spinner("Building PDF report…"):
+                pdf_bytes = generate_pdf_report(
+                    name_display, gender, age_cat, bmi, sleep_time,
+                    general_health, physical_health, mental_health,
+                    smoking, alcohol, stroke, diabetic, kidney_disease,
+                    walking_diff, physical_activity, prob, prediction,
+                    st.session_state.get("last_tips", "")
+                )
+                b64 = base64.b64encode(pdf_bytes).decode()
+                filename = f"HeartRisk_{name_display.replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                href = f'''<a href="data:application/pdf;base64,{b64}"
+                              download="{filename}"
+                              style="display:inline-block;background:linear-gradient(135deg,#e63946,#c1121f);
+                                     color:white;padding:10px 22px;border-radius:8px;
+                                     text-decoration:none;font-weight:700;font-size:14px;
+                                     margin-top:4px;">
+                              📄 Click to Download PDF</a>'''
+                st.markdown(href, unsafe_allow_html=True)
+
     # ── ✨ AI-Powered Personalised Health Tips ─────────────────────────────────
     st.divider()
 
@@ -670,286 +1047,6 @@ if submitted:
                 </p>
             </div>
             """, unsafe_allow_html=True)
+            st.session_state.last_tips = tips_text
         except Exception as e:
             st.warning(f"Could not load AI tips: {e}")
-
-
-    # ── 🧠 What-If Simulator ───────────────────────────────────────────────────
-    st.divider()
-    st.markdown("""
-    <div class="simulator-container">
-        <span class="simulator-title">🧠 What-If Simulator</span>
-        <span class="simulator-subtitle">Adjust lifestyle factors below and instantly see how your heart disease risk changes using the same ML model.</span>
-    </div>
-    """, unsafe_allow_html=True)
-
-    with st.expander("⚙️ Open What-If Simulator", expanded=True):
-        st.markdown("**Tweak the sliders to simulate lifestyle improvements:**")
-
-        wc1, wc2, wc3 = st.columns(3)
-        with wc1:
-            sim_bmi       = st.slider("💪 Simulate BMI",        10.0, 60.0, float(bmi),        0.5, key="sim_bmi")
-            sim_sleep     = st.slider("😴 Simulate Sleep (hrs)", 1.0,  12.0, float(sleep_time), 0.5, key="sim_sleep")
-        with wc2:
-            sim_phys      = st.slider("🏃 Physical Health Bad Days", 0, 30, physical_health, 1, key="sim_phys")
-            sim_mental    = st.slider("🧘 Mental Health Bad Days",   0, 30, mental_health,   1, key="sim_mental")
-        with wc3:
-            sim_smoking   = st.checkbox("🚬 Still Smoking",         value=smoking,          key="sim_smoke")
-            sim_active    = st.checkbox("🏋️ Physically Active",     value=physical_activity, key="sim_active")
-            sim_alcohol   = st.checkbox("🍺 Heavy Alcohol Drinker", value=alcohol,           key="sim_alc")
-            sim_gh        = st.selectbox("🩺 General Health",       GENERAL_HEALTH,
-                                         index=GENERAL_HEALTH.index(general_health), key="sim_gh")
-
-        # Build 4 preset scenarios + 1 custom
-        scenarios = []
-
-        # Scenario 1: Quit smoking (if smoker)
-        if smoking:
-            df_s1 = encode_inputs(bmi, False, alcohol, stroke, physical_health,
-                                  mental_health, walking_diff, gender, age_cat,
-                                  ethnicity, diabetic, physical_activity,
-                                  general_health, sleep_time, kidney_disease)
-            scenarios.append({"label": "Quit Smoking", "prob": model.predict_proba(df_s1)[0][1]})
-
-        # Scenario 2: Improve sleep to 8hrs
-        if sleep_time < 7.5:
-            df_s2 = encode_inputs(bmi, smoking, alcohol, stroke, physical_health,
-                                  mental_health, walking_diff, gender, age_cat,
-                                  ethnicity, diabetic, physical_activity,
-                                  general_health, 8.0, kidney_disease)
-            scenarios.append({"label": "Sleep 8 hrs", "prob": model.predict_proba(df_s2)[0][1]})
-
-        # Scenario 3: Reduce BMI by 3
-        if bmi > 22:
-            df_s3 = encode_inputs(max(18.5, bmi - 3), smoking, alcohol, stroke,
-                                  physical_health, mental_health, walking_diff,
-                                  gender, age_cat, ethnicity, diabetic,
-                                  physical_activity, general_health, sleep_time, kidney_disease)
-            scenarios.append({"label": f"BMI -{3}", "prob": model.predict_proba(df_s3)[0][1]})
-
-        # Scenario 4: Become physically active
-        if not physical_activity:
-            df_s4 = encode_inputs(bmi, smoking, alcohol, stroke, physical_health,
-                                  mental_health, walking_diff, gender, age_cat,
-                                  ethnicity, diabetic, True,
-                                  general_health, sleep_time, kidney_disease)
-            scenarios.append({"label": "Get Active", "prob": model.predict_proba(df_s4)[0][1]})
-
-        # Scenario 5: Best case — all improvements
-        df_best = encode_inputs(
-            max(18.5, bmi - 3), False, False, stroke,
-            max(0, physical_health - 5), max(0, mental_health - 5),
-            walking_diff, gender, age_cat, ethnicity, diabetic,
-            True, "Very good", min(9.0, sleep_time + 1.5), kidney_disease
-        )
-        scenarios.append({"label": "Best Case 🌟", "prob": model.predict_proba(df_best)[0][1]})
-
-        # Scenario 6: Custom (user sliders)
-        df_custom = encode_inputs(
-            sim_bmi, sim_smoking, sim_alcohol, stroke, sim_phys,
-            sim_mental, walking_diff, gender, age_cat, ethnicity,
-            diabetic, sim_active, sim_gh, sim_sleep, kidney_disease
-        )
-        custom_prob = model.predict_proba(df_custom)[0][1]
-        scenarios.append({"label": "🎛️ My Custom", "prob": custom_prob})
-
-        # ── Results ──
-        st.divider()
-        rc1, rc2 = st.columns([2, 1])
-
-        with rc1:
-            if scenarios:
-                st.pyplot(whatif_chart(prob, scenarios), use_container_width=True)
-
-        with rc2:
-            # Show custom scenario result prominently
-            delta     = prob - custom_prob
-            delta_pct = round(delta * 100, 1)
-            drop_class = "sim-drop-positive" if delta > 0 else "sim-drop-negative"
-            arrow      = "▼" if delta > 0 else "▲"
-            change_txt = f"{arrow} {abs(delta_pct)}% {'reduction' if delta > 0 else 'increase'} in risk"
-
-            # Insight message
-            insights = []
-            if sim_bmi < bmi - 1:       insights.append(f"Lowering BMI from {bmi} → {sim_bmi} helps reduce cardiac load.")
-            if sim_sleep > sleep_time:  insights.append(f"Better sleep ({sim_sleep}h) improves heart recovery cycles.")
-            if not sim_smoking and smoking: insights.append("Quitting smoking is the single highest-impact change.")
-            if sim_active and not physical_activity: insights.append("Becoming active significantly lowers risk.")
-            insight_html = "<br>".join(f"• {i}" for i in insights) if insights else "• Adjust the sliders above to see personalised insights."
-
-            st.markdown(f"""
-            <div class="sim-result-box">
-                <p class="sim-orig-score">Original Risk: {prob*100:.1f}%</p>
-                <p class="sim-new-score">{custom_prob*100:.1f}%</p>
-                <p class="{drop_class}">{change_txt}</p>
-                <div class="sim-insight">{insight_html}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # Best case callout
-            best_prob = model.predict_proba(df_best)[0][1]
-            best_drop = round((prob - best_prob) * 100, 1)
-            if best_drop > 0:
-                st.success(f"🌟 With all improvements, risk could drop by **{best_drop}%** (to {best_prob*100:.1f}%)")
-
-    # ── 📊 Save to Patient History ─────────────────────────────────────────────
-    if "patient_history" not in st.session_state:
-        st.session_state.patient_history = []
-
-    record = {
-        "name":       name_display,
-        "time":       datetime.now().strftime("%d %b %Y, %I:%M %p"),
-        "gender":     gender,
-        "age":        age_cat,
-        "bmi":        round(bmi, 1),
-        "sleep":      sleep_time,
-        "risk_score": round(prob * 100, 1),
-        "prediction": int(prediction),
-        "smoking":    smoking,
-        "diabetic":   diabetic,
-        "physical_health": physical_health,
-        "mental_health":   mental_health,
-        "general_health":  general_health,
-    }
-    # Avoid duplicate on re-run
-    if not st.session_state.patient_history or st.session_state.patient_history[-1] != record:
-        st.session_state.patient_history.append(record)
-
-# ── 📊 Patient History Section ────────────────────────────────────────────────
-if "patient_history" in st.session_state and len(st.session_state.patient_history) > 0:
-    history = st.session_state.patient_history
-
-    st.divider()
-    st.subheader("📊 Patient History")
-
-    # ── Clear button ──
-    if st.button("🗑️ Clear History"):
-        st.session_state.patient_history = []
-        st.rerun()
-
-    # ── History rows ──
-    rows_html = ""
-    for i, r in enumerate(reversed(history)):
-        badge = f'<span class="badge-high">⚠ High Risk</span>' if r["prediction"] == 1 else f'<span class="badge-low">✓ Low Risk</span>'
-        rows_html += f"""
-        <div class="history-row">
-            <span><b style="color:#f0f0f0">{r['name']}</b> &nbsp;·&nbsp; {r['gender']} &nbsp;·&nbsp; {r['age']}</span>
-            <span>BMI {r['bmi']} &nbsp;|&nbsp; Sleep {r['sleep']}h &nbsp;|&nbsp; {r['time']}</span>
-            <span>Risk: <b style="color:#e8e8e8">{r['risk_score']}%</b> &nbsp;{badge}</span>
-        </div>"""
-
-    st.markdown(f"""
-    <div class="history-container">
-        <span class="history-title">👥 All Analysed Patients — {len(history)} record(s)</span>
-        {rows_html}
-    </div>
-    """, unsafe_allow_html=True)
-
-    # ── 📈 Risk Trend Chart ────────────────────────────────────────────────────
-    if len(history) >= 2:
-        st.divider()
-        st.subheader("📈 Risk Trend Chart")
-        st.caption("Compares risk scores across all analysed patients this session.")
-
-        names       = [f"{r['name']} ({r['age']})" for r in history]
-        risk_scores = [r["risk_score"] for r in history]
-        bmis        = [r["bmi"] for r in history]
-        sleeps      = [r["sleep"] for r in history]
-
-        fig, axes = plt.subplots(1, 3, figsize=(16, 4))
-        fig.patch.set_facecolor("#0d0d0d")
-
-        # ── Chart 1: Risk Score per Patient ──
-        ax1 = axes[0]
-        ax1.set_facecolor("#0d0d0d")
-        bar_colors = ["#e63946" if r["prediction"] == 1 else "#52b788" for r in history]
-        bars = ax1.bar(range(len(names)), risk_scores, color=bar_colors,
-                       edgecolor="none", width=0.55)
-        ax1.set_xticks(range(len(names)))
-        ax1.set_xticklabels([r["name"] for r in history], rotation=25,
-                            ha="right", fontsize=9, color="#cccccc")
-        ax1.set_ylabel("Risk Score (%)", color="#aaaaaa", fontsize=10)
-        ax1.set_ylim(0, 105)
-        ax1.axhline(50, color="#555", linewidth=0.8, linestyle="--")
-        ax1.text(len(names) - 0.5, 52, "50% threshold", fontsize=8,
-                 color="#666", ha="right")
-        for bar, val in zip(bars, risk_scores):
-            ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1.5,
-                     f"{val}%", ha="center", va="bottom", fontsize=8,
-                     color="#e8e8e8", fontweight="600")
-        ax1.set_title("Risk Score per Patient", color="#f0f0f0",
-                      fontsize=12, fontweight="700", pad=12)
-        ax1.spines["bottom"].set_color("#333")
-        ax1.spines["left"].set_color("#333")
-        ax1.tick_params(colors="#aaaaaa")
-
-        # ── Chart 2: Risk Score Trend Line ──
-        ax2 = axes[1]
-        ax2.set_facecolor("#0d0d0d")
-        x = range(len(history))
-        ax2.plot(x, risk_scores, color="#e63946", linewidth=2.5,
-                 marker="o", markersize=7, markerfacecolor="#ff6b6b",
-                 markeredgecolor="#e63946", zorder=3)
-        ax2.fill_between(x, risk_scores, alpha=0.15, color="#e63946")
-        ax2.set_xticks(x)
-        ax2.set_xticklabels([r["name"] for r in history], rotation=25,
-                            ha="right", fontsize=9, color="#cccccc")
-        ax2.set_ylabel("Risk Score (%)", color="#aaaaaa", fontsize=10)
-        ax2.set_ylim(0, 105)
-        ax2.axhline(50, color="#555", linewidth=0.8, linestyle="--")
-        for xi, val in zip(x, risk_scores):
-            ax2.annotate(f"{val}%", (xi, val), textcoords="offset points",
-                         xytext=(0, 10), ha="center", fontsize=8,
-                         color="#e8e8e8")
-        ax2.set_title("Risk Score Trend", color="#f0f0f0",
-                      fontsize=12, fontweight="700", pad=12)
-        ax2.spines["bottom"].set_color("#333")
-        ax2.spines["left"].set_color("#333")
-        ax2.tick_params(colors="#aaaaaa")
-        ax2.grid(axis="y", color="#1e1e1e", linewidth=0.8)
-
-        # ── Chart 3: BMI vs Sleep Scatter ──
-        ax3 = axes[2]
-        ax3.set_facecolor("#0d0d0d")
-        sc_colors = ["#e63946" if r["prediction"] == 1 else "#52b788" for r in history]
-        scatter = ax3.scatter(bmis, sleeps, c=sc_colors, s=120,
-                              edgecolors="#444", linewidths=0.8, zorder=3)
-        for i, r in enumerate(history):
-            ax3.annotate(r["name"], (bmis[i], sleeps[i]),
-                         textcoords="offset points", xytext=(6, 4),
-                         fontsize=8, color="#aaaaaa")
-        ax3.set_xlabel("BMI", color="#aaaaaa", fontsize=10)
-        ax3.set_ylabel("Sleep (hrs)", color="#aaaaaa", fontsize=10)
-        ax3.set_title("BMI vs Sleep Quality", color="#f0f0f0",
-                      fontsize=12, fontweight="700", pad=12)
-        ax3.spines["bottom"].set_color("#333")
-        ax3.spines["left"].set_color("#333")
-        ax3.tick_params(colors="#aaaaaa")
-        ax3.grid(color="#1e1e1e", linewidth=0.8)
-
-        from matplotlib.lines import Line2D
-        legend_elements = [
-            Line2D([0], [0], marker="o", color="w", markerfacecolor="#e63946",
-                   markersize=9, label="High Risk"),
-            Line2D([0], [0], marker="o", color="w", markerfacecolor="#52b788",
-                   markersize=9, label="Low Risk"),
-        ]
-        ax3.legend(handles=legend_elements, fontsize=8, framealpha=0,
-                   labelcolor="#cccccc", loc="upper right")
-
-        plt.tight_layout(pad=2.0)
-        st.pyplot(fig, use_container_width=True)
-
-        # ── Summary Stats ──
-        st.divider()
-        s1, s2, s3, s4 = st.columns(4)
-        high_risk = sum(1 for r in history if r["prediction"] == 1)
-        avg_risk  = round(sum(r["risk_score"] for r in history) / len(history), 1)
-        avg_bmi   = round(sum(r["bmi"] for r in history) / len(history), 1)
-        avg_sleep = round(sum(r["sleep"] for r in history) / len(history), 1)
-        s1.metric("Total Patients",  len(history))
-        s2.metric("High Risk Count", f"{high_risk} / {len(history)}")
-        s3.metric("Avg Risk Score",  f"{avg_risk}%")
-        s4.metric("Avg BMI",         avg_bmi)
-    else:
-        st.info("📈 Analyse at least 2 patients to see the Risk Trend Chart.")
