@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
-from groq import Groq
+import anthropic
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -142,7 +142,11 @@ st.markdown("""
 @st.cache_resource
 def load_model():
     df = pd.read_csv("cleaned_heart.csv")
-    df = df.drop(columns=['AgeGroup', 'BP_Category'])
+
+    # Drop optional derived columns if they exist
+    for col in ['AgeGroup', 'BP_Category']:
+        if col in df.columns:
+            df = df.drop(columns=[col])
 
     cat_features = ['Gender', 'ChestPainType', 'RestingECG', 'ExerciseAngina', 'ST_Slope']
     le = LabelEncoder()
@@ -164,58 +168,67 @@ model, encoders = load_model()
 
 
 # ─────────────────────────────────────────────────────────────
-# AI RECOMMENDATION FUNCTION (GROQ - FREE)
+# AI RECOMMENDATION — uses Anthropic Claude API
 # ─────────────────────────────────────────────────────────────
 def get_ai_recommendation(patient_name, age, gender, chest_pain, bp,
-                            cholesterol, max_hr, ex_angina, oldpeak,
-                            st_slope, fasting_bs, prediction, probability):
+                           cholesterol, max_hr, ex_angina, oldpeak,
+                           st_slope, fasting_bs, prediction, probability):
 
-    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+    # Try to get API key from Streamlit secrets first, fall back to env
+    api_key = None
+    try:
+        api_key = st.secrets["ANTHROPIC_API_KEY"]
+    except Exception:
+        import os
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+
+    if not api_key:
+        raise ValueError("ANTHROPIC_API_KEY not found. Add it to Streamlit secrets or environment variables.")
+
+    client = anthropic.Anthropic(api_key=api_key)
 
     risk_level = "HIGH RISK — Heart Disease Detected" if prediction == 1 else "LOW RISK — No Heart Disease"
-    disease_prob = f"{probability[1]*100:.1f}%"
+    disease_prob = f"{probability[1] * 100:.1f}%"
 
-    prompt = f"""
-You are a helpful medical AI assistant. A patient has just received their heart disease prediction result.
+    prompt = f"""You are a helpful medical AI assistant. A patient has just received their heart disease prediction result.
 Provide a clear, friendly, and helpful health recommendation report.
 
 Patient Details:
-- Name         : {patient_name}
-- Age          : {age} years
-- Gender       : {gender}
-- Chest Pain   : {chest_pain}
-- Resting BP   : {bp} mmHg
-- Cholesterol  : {cholesterol} mg/dl
-- Max Heart Rate: {max_hr}
-- Exercise Angina: {ex_angina}
-- Oldpeak      : {oldpeak}
-- ST Slope     : {st_slope}
-- Fasting Blood Sugar > 120: {fasting_bs}
+- Name              : {patient_name}
+- Age               : {age} years
+- Gender            : {gender}
+- Chest Pain Type   : {chest_pain}
+- Resting BP        : {bp} mmHg
+- Cholesterol       : {cholesterol} mg/dl
+- Max Heart Rate    : {max_hr}
+- Exercise Angina   : {ex_angina}
+- Oldpeak           : {oldpeak}
+- ST Slope          : {st_slope}
+- Fasting Blood Sugar > 120 mg/dl: {fasting_bs}
 
-Prediction Result: {risk_level}
-Disease Probability: {disease_prob}
+Prediction Result   : {risk_level}
+Disease Probability : {disease_prob}
 
-Please provide:
-1. A short personalized greeting for {patient_name}
-2. Brief explanation of what the result means
-3. Top 5 specific health recommendations based on their data
-4. Lifestyle changes they should make
-5. When they should see a doctor
+Please provide a personalised report for {patient_name} with:
+1. A short personalised greeting using their name
+2. Brief explanation of what the result means for them specifically
+3. Top 5 specific health recommendations based on their individual data values above
+4. Concrete lifestyle changes they should make
+5. Clear guidance on when and how urgently they should see a doctor
 
-Keep the tone warm, clear, and easy to understand. Use bullet points.
-Do NOT use any markdown headers with # symbols. Keep response concise.
+Keep the tone warm, clear, and easy to understand. Use bullet points for recommendations.
+Do NOT use markdown headers with # symbols.
+Keep the response concise (under 400 words).
 
-Important: Always end with a reminder that this is an AI tool and they should consult a real doctor.
-"""
+IMPORTANT: Always end with a reminder that this is an AI screening tool and they must consult a qualified doctor for proper diagnosis and treatment."""
 
-    response = client.chat.completions.create(
-        model="llama3-8b-8192",   # Free model on Groq
-        messages=[{"role": "user", "content": prompt}],
+    message = client.messages.create(
+        model="claude-opus-4-5",
         max_tokens=700,
-        temperature=0.7
+        messages=[{"role": "user", "content": prompt}]
     )
 
-    return response.choices[0].message.content
+    return message.content[0].text
 
 
 # ─────────────────────────────────────────────────────────────
@@ -223,7 +236,7 @@ Important: Always end with a reminder that this is an AI tool and they should co
 # ─────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## ❤️ About This App")
-    st.markdown("Predicts heart disease risk using a **Random Forest** ML model + **AI recommendations**.")
+    st.markdown("Predicts heart disease risk using a **Random Forest** ML model + **AI recommendations** powered by Claude.")
     st.markdown("---")
     st.markdown("### 📊 Model Performance")
     col1, col2 = st.columns(2)
@@ -258,7 +271,6 @@ st.markdown("---")
 # ─────────────────────────────────────────────────────────────
 st.markdown("<div class='section-header'>👤 Patient Details</div>", unsafe_allow_html=True)
 patient_name = st.text_input("Patient Full Name", placeholder="e.g. Rahul Sharma")
-
 st.markdown("---")
 
 
@@ -327,7 +339,6 @@ predict_btn = st.button("🔍  Predict Heart Disease Risk", use_container_width=
 
 if predict_btn:
 
-    # Validate name
     if not patient_name.strip():
         st.warning("⚠️  Please enter the patient's name before predicting.")
         st.stop()
@@ -413,16 +424,16 @@ if predict_btn:
                      '🔴 Low' if max_hr < 100 else '🟢 Normal',
                      '🔴 Yes' if ex_angina == 'Yes' else '🟢 No',
                      '🔴 High' if oldpeak > 2 else '🟢 Normal',
-                     '🔴 Risk' if st_slope in ['FLAT','DOWN'] else '🟢 Normal']
+                     '🔴 Risk' if st_slope in ['FLAT', 'DOWN'] else '🟢 Normal']
     })
     st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
     st.markdown("---")
 
-    # ── AI RECOMMENDATIONS ──
+    # ── AI RECOMMENDATIONS (Claude) ──
     st.markdown("<div class='section-header'>🤖 AI Health Recommendations</div>", unsafe_allow_html=True)
 
-    with st.spinner(f"🧠 Generating personalized recommendations for {patient_name}..."):
+    with st.spinner(f"🧠 Generating personalised recommendations for {patient_name}..."):
         try:
             ai_response = get_ai_recommendation(
                 patient_name, age, gender,
@@ -437,7 +448,8 @@ if predict_btn:
             </div>
             """, unsafe_allow_html=True)
 
+        except ValueError as ve:
+            st.error(f"⚠️ API Key Error: {ve}")
+            st.info("👉 Add your Anthropic API key to `.streamlit/secrets.toml` as:\n```\nANTHROPIC_API_KEY = 'sk-ant-...'\n```")
         except Exception as e:
-            st.error("⚠️ AI recommendations unavailable. Please check your Groq API key in Streamlit Secrets.")
-
-    
+            st.error(f"⚠️ AI recommendations unavailable: {str(e)}")
