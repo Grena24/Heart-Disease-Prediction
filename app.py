@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
-import anthropic
+from groq import Groq
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -143,7 +143,6 @@ st.markdown("""
 def load_model():
     df = pd.read_csv("cleaned_heart.csv")
 
-    # Drop optional derived columns if they exist
     for col in ['AgeGroup', 'BP_Category']:
         if col in df.columns:
             df = df.drop(columns=[col])
@@ -168,24 +167,18 @@ model, encoders = load_model()
 
 
 # ─────────────────────────────────────────────────────────────
-# AI RECOMMENDATION — uses Anthropic Claude API
+# AI RECOMMENDATION — Groq (llama3)
 # ─────────────────────────────────────────────────────────────
 def get_ai_recommendation(patient_name, age, gender, chest_pain, bp,
                            cholesterol, max_hr, ex_angina, oldpeak,
                            st_slope, fasting_bs, prediction, probability):
 
-    # Try to get API key from Streamlit secrets first, fall back to env
-    api_key = None
     try:
-        api_key = st.secrets["ANTHROPIC_API_KEY"]
+        api_key = st.secrets["GROQ_API_KEY"]
     except Exception:
-        import os
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        raise ValueError("GROQ_API_KEY not found. Go to Streamlit Cloud → App Settings → Secrets and add:\nGROQ_API_KEY = 'gsk_your_key_here'")
 
-    if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY not found. Add it to Streamlit secrets or environment variables.")
-
-    client = anthropic.Anthropic(api_key=api_key)
+    client = Groq(api_key=api_key)
 
     risk_level = "HIGH RISK — Heart Disease Detected" if prediction == 1 else "LOW RISK — No Heart Disease"
     disease_prob = f"{probability[1] * 100:.1f}%"
@@ -220,15 +213,16 @@ Keep the tone warm, clear, and easy to understand. Use bullet points for recomme
 Do NOT use markdown headers with # symbols.
 Keep the response concise (under 400 words).
 
-IMPORTANT: Always end with a reminder that this is an AI screening tool and they must consult a qualified doctor for proper diagnosis and treatment."""
+IMPORTANT: Always end with a reminder that this is an AI screening tool and they must consult a qualified doctor."""
 
-    message = client.messages.create(
-        model="claude-opus-4-5",
+    response = client.chat.completions.create(
+        model="llama3-8b-8192",
+        messages=[{"role": "user", "content": prompt}],
         max_tokens=700,
-        messages=[{"role": "user", "content": prompt}]
+        temperature=0.7
     )
 
-    return message.content[0].text
+    return response.choices[0].message.content
 
 
 # ─────────────────────────────────────────────────────────────
@@ -236,7 +230,7 @@ IMPORTANT: Always end with a reminder that this is an AI screening tool and they
 # ─────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## ❤️ About This App")
-    st.markdown("Predicts heart disease risk using a **Random Forest** ML model + **AI recommendations** powered by Claude.")
+    st.markdown("Predicts heart disease risk using a **Random Forest** ML model + **AI recommendations** powered by Groq.")
     st.markdown("---")
     st.markdown("### 📊 Model Performance")
     col1, col2 = st.columns(2)
@@ -348,7 +342,6 @@ if predict_btn:
 
     st.markdown("---")
 
-    # Patient badge
     st.markdown(f"""
     <div class='patient-badge'>
         👤 Patient : {patient_name}
@@ -392,7 +385,6 @@ if predict_btn:
         </div>
         """, unsafe_allow_html=True)
 
-    # Risk gauge
     st.markdown("#### 🎯 Risk Gauge")
     st.markdown(f"""
     <div class='prob-label'>
@@ -404,7 +396,6 @@ if predict_btn:
 
     st.markdown("---")
 
-    # Patient summary table
     st.markdown("<div class='section-header'>📝 Patient Summary</div>", unsafe_allow_html=True)
     summary_df = pd.DataFrame({
         'Feature' : ['Patient Name', 'Age', 'Gender', 'Chest Pain', 'Resting BP',
@@ -430,7 +421,7 @@ if predict_btn:
 
     st.markdown("---")
 
-    # ── AI RECOMMENDATIONS (Claude) ──
+    # ── AI RECOMMENDATIONS (Groq) ──
     st.markdown("<div class='section-header'>🤖 AI Health Recommendations</div>", unsafe_allow_html=True)
 
     with st.spinner(f"🧠 Generating personalised recommendations for {patient_name}..."):
@@ -449,7 +440,6 @@ if predict_btn:
             """, unsafe_allow_html=True)
 
         except ValueError as ve:
-            st.error(f"⚠️ API Key Error: {ve}")
-            st.info("👉 Add your Anthropic API key to `.streamlit/secrets.toml` as:\n```\nANTHROPIC_API_KEY = 'sk-ant-...'\n```")
+            st.error(f"⚠️ {ve}")
         except Exception as e:
             st.error(f"⚠️ AI recommendations unavailable: {str(e)}")
