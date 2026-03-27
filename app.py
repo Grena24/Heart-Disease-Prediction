@@ -224,6 +224,9 @@ def load_model():
         if col in df.columns:
             df = df.drop(columns=[col])
 
+    # Fix cholesterol zeros (missing data entered as 0)
+    df['Cholesterol'] = df['Cholesterol'].replace(0, df['Cholesterol'].median())
+
     cat_features = ['Gender', 'ChestPainType', 'RestingECG', 'ExerciseAngina', 'ST_Slope']
     le = LabelEncoder()
     encoders = {}
@@ -233,12 +236,17 @@ def load_model():
 
     X = df.drop(columns=['HeartDisease'])
     y = df['HeartDisease']
-    X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     model = RandomForestClassifier(n_estimators=200, random_state=42)
     model.fit(X_train, y_train)
-    return model, encoders
 
-model, encoders = load_model()
+    from sklearn.metrics import accuracy_score, roc_auc_score
+    actual_acc = accuracy_score(y_test, model.predict(X_test))
+    actual_auc = roc_auc_score(y_test, model.predict_proba(X_test)[:,1])
+
+    return model, encoders, round(actual_acc * 100, 1), round(actual_auc, 3)
+
+model, encoders, model_acc, model_auc = load_model()
 
 
 # ─────────────────────────────────────────────────────────────
@@ -662,9 +670,9 @@ with st.sidebar:
     st.markdown("### 📊 Model Performance")
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("""<div class='metric-card'><h3>87.5%</h3><p>Accuracy</p></div>""", unsafe_allow_html=True)
+        st.markdown(f"""<div class='metric-card'><h3>{model_acc}%</h3><p>Accuracy</p></div>""", unsafe_allow_html=True)
     with col2:
-        st.markdown("""<div class='metric-card'><h3>0.93</h3><p>ROC-AUC</p></div>""", unsafe_allow_html=True)
+        st.markdown(f"""<div class='metric-card'><h3>{model_auc}</h3><p>ROC-AUC</p></div>""", unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("### 🏥 Dataset Info")
     st.markdown("- 📋 **918** patient records\n- 🔬 **11** clinical features\n- 🎯 Binary classification")
@@ -724,6 +732,17 @@ with col3:
     st_slope    = st.selectbox("ST Slope", ["UP", "FLAT", "DOWN"])
 
 st.markdown("---")
+
+
+# ─────────────────────────────────────────────────────────────
+# INPUT VALIDATION
+# ─────────────────────────────────────────────────────────────
+if cholesterol < 100:
+    st.warning("⚠️ Cholesterol below 100 mg/dl is unusually low. Please double-check the value.")
+if resting_bp < 80:
+    st.warning("⚠️ Resting BP below 80 mmHg is unusually low. Please double-check the value.")
+if max_hr < 60:
+    st.warning("⚠️ Max Heart Rate below 60 bpm is unusually low. Please double-check the value.")
 
 
 # ─────────────────────────────────────────────────────────────
