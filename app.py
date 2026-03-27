@@ -216,7 +216,7 @@ Keep the response concise (under 400 words).
 IMPORTANT: Always end with a reminder that this is an AI screening tool and they must consult a qualified doctor."""
 
     response = client.chat.completions.create(
-        model="llama3-8b-8192",
+        model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=700,
         temperature=0.7
