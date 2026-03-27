@@ -183,37 +183,27 @@ def get_ai_recommendation(patient_name, age, gender, chest_pain, bp,
     risk_level = "HIGH RISK — Heart Disease Detected" if prediction == 1 else "LOW RISK — No Heart Disease"
     disease_prob = f"{probability[1] * 100:.1f}%"
 
-    prompt = f"""You are a helpful medical AI assistant. A patient has just received their heart disease prediction result.
-Provide a clear, friendly, and helpful health recommendation report.
+    prompt = f"""You are a medical health advisor. Based on the patient's clinical report, give personalised lifestyle recommendations.
 
-Patient Details:
-- Name              : {patient_name}
-- Age               : {age} years
-- Gender            : {gender}
-- Chest Pain Type   : {chest_pain}
-- Resting BP        : {bp} mmHg
-- Cholesterol       : {cholesterol} mg/dl
-- Max Heart Rate    : {max_hr}
-- Exercise Angina   : {ex_angina}
-- Oldpeak           : {oldpeak}
-- ST Slope          : {st_slope}
-- Fasting Blood Sugar > 120 mg/dl: {fasting_bs}
+Patient: {patient_name}, {age} years old, {gender}
+- Chest Pain: {chest_pain}
+- Resting BP: {bp} mmHg
+- Cholesterol: {cholesterol} mg/dl
+- Max Heart Rate: {max_hr}
+- Exercise Angina: {ex_angina}
+- Oldpeak: {oldpeak}
+- ST Slope: {st_slope}
+- Fasting Blood Sugar > 120: {fasting_bs}
+- Prediction: {risk_level} (Probability: {disease_prob})
 
-Prediction Result   : {risk_level}
-Disease Probability : {disease_prob}
+Write a short warm greeting to {patient_name} by name, then provide ONLY the following as bullet points:
+- Diet changes specific to their values (e.g. address high cholesterol or BP if present)
+- Exercise and physical activity advice
+- Daily habits and lifestyle changes to adopt
+- Things to avoid or be careful about
+- What to monitor regularly and when to visit a doctor (mention this only once, briefly at the end)
 
-Please provide a personalised report for {patient_name} with:
-1. A short personalised greeting using their name
-2. Brief explanation of what the result means for them specifically
-3. Top 5 specific health recommendations based on their individual data values above
-4. Concrete lifestyle changes they should make
-5. Clear guidance on when and how urgently they should see a doctor
-
-Keep the tone warm, clear, and easy to understand. Use bullet points for recommendations.
-Do NOT use markdown headers with # symbols.
-Keep the response concise (under 400 words).
-
-IMPORTANT: Always end with a reminder that this is an AI screening tool and they must consult a qualified doctor."""
+Be direct and specific to their actual numbers. Do NOT mention AI, tools, technology, or disclaimers anywhere. Do NOT use # headers."""
 
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
@@ -405,15 +395,15 @@ if predict_btn:
                      f"{resting_bp} mmHg", f"{cholesterol} mg/dl", fasting_bs,
                      resting_ecg, max_hr, ex_angina, oldpeak, st_slope],
         'Status'  : ['—',
-                     '🟡 Risk Factor' if age > 55 else '🟢 Normal',
-                     '🟡 Higher Risk' if gender == 'Male' else '🟢 Normal',
+                     '🔴 Risk Factor' if age > 55 else '🟢 Normal',
+                     '🔴 Higher Risk' if gender == 'Male' else '🟢 Normal',
                      '🔴 High Risk' if 'ASY' in chest else '🟢 Normal',
-                     '🔴 High' if resting_bp > 140 else '🟢 Normal',
+                     '🔴 High BP' if resting_bp > 140 else '🟢 Normal',
                      '🔴 High' if cholesterol > 240 else '🟢 Normal',
-                     '🔴 Yes' if fasting_bs == 'Yes' else '🟢 No',
+                     '🔴 Elevated' if fasting_bs == 'Yes' else '🟢 Normal',
                      '🟢 Normal' if resting_ecg == 'NORMAL' else '🔴 Abnormal',
                      '🔴 Low' if max_hr < 100 else '🟢 Normal',
-                     '🔴 Yes' if ex_angina == 'Yes' else '🟢 No',
+                     '🔴 Present' if ex_angina == 'Yes' else '🟢 Normal',
                      '🔴 High' if oldpeak > 2 else '🟢 Normal',
                      '🔴 Risk' if st_slope in ['FLAT', 'DOWN'] else '🟢 Normal']
     })
