@@ -437,7 +437,8 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
     # ══════════════════════════════════════════
     # 1. HEADER
     # ══════════════════════════════════════════
-    now = datetime.datetime.now()
+    IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+    now = datetime.datetime.now(IST)
     left_col = [
         Paragraph("CARDIAC HEALTH REPORT", hdr_title),
         Spacer(1, 3),
@@ -616,6 +617,35 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
         ("LEFTPADDING",   (0,0), (-1,-1), 10),
     ]))
     story.append(leg_tbl)
+    story.append(Spacer(1, 0.35*cm))
+
+    # ══════════════════════════════════════════
+    # 7. HIGH RISK CARDIOLOGIST NOTICE
+    # ══════════════════════════════════════════
+    if pred == 1:
+        alert_style = ParagraphStyle('Alert', fontName='Helvetica-Bold',
+            fontSize=11, textColor=WHITE, alignment=TA_CENTER, leading=16)
+        alert_sub   = ParagraphStyle('AlertSub', fontName='Helvetica',
+            fontSize=9.5, textColor=colors.HexColor('#FDEDEC'), alignment=TA_CENTER, leading=14)
+        alert_data  = [
+            [Paragraph("IMPORTANT — HIGH RISK DETECTED", alert_style)],
+            [Paragraph(
+                "Based on the clinical values above, this patient shows signs of elevated cardiac risk.  "
+                "Please consult a Cardiologist at the earliest for a thorough examination, ECG, "
+                "echocardiogram, and appropriate treatment.",
+                alert_sub)],
+        ]
+        alert_tbl = Table(alert_data, colWidths=[W])
+        alert_tbl.setStyle(TableStyle([
+            ('BACKGROUND',    (0,0), (0,0),  colors.HexColor('#922B21')),
+            ('BACKGROUND',    (0,1), (0,1),  colors.HexColor('#C0392B')),
+            ('TOPPADDING',    (0,0), (-1,-1), 10),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 10),
+            ('LEFTPADDING',   (0,0), (-1,-1), 14),
+            ('RIGHTPADDING',  (0,0), (-1,-1), 14),
+            ('LINEABOVE',     (0,0), (-1,0),  3, colors.HexColor('#7B241C')),
+        ]))
+        story.append(alert_tbl)
 
     doc.build(story)
     buffer.seek(0)
