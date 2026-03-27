@@ -366,232 +366,256 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
-        leftMargin=2*cm, rightMargin=2*cm,
-        topMargin=2*cm, bottomMargin=2*cm
+        leftMargin=1.8*cm, rightMargin=1.8*cm,
+        topMargin=1.5*cm, bottomMargin=1.5*cm
     )
 
-    # ── Colour palette ──
-    RED     = colors.HexColor('#C0392B')
-    GREEN   = colors.HexColor('#27AE60')
-    ORANGE  = colors.HexColor('#E67E22')
-    DARK    = colors.HexColor('#1A1A2E')
-    LIGHT   = colors.HexColor('#ECF0F1')
-    WHITE   = colors.white
-    YELLOW  = colors.HexColor('#F39C12')
-    BLUE    = colors.HexColor('#2980B9')
-    LGRAY   = colors.HexColor('#F2F4F5')
-    MGRAY   = colors.HexColor('#BDC3C7')
-    RISK_BG = colors.HexColor('#FDEDEC') if pred == 1 else colors.HexColor('#EAFAF1')
-    RISK_BD = RED if pred == 1 else GREEN
+    # ── Colours ──
+    NAVY      = colors.HexColor('#0D1B3E')
+    NAVY_MID  = colors.HexColor('#1A2F5E')
+    ACCENT    = colors.HexColor('#C0392B')
+    GREEN     = colors.HexColor('#1E8449')
+    RED       = colors.HexColor('#C0392B')
+    AMBER     = colors.HexColor('#D35400')
+    WHITE     = colors.white
+    OFF_WHITE = colors.HexColor('#F8F9FA')
+    LGRAY     = colors.HexColor('#EDF0F2')
+    MGRAY     = colors.HexColor('#AEB6BF')
+    DGRAY     = colors.HexColor('#5D6D7E')
+    ROW_ALT   = colors.HexColor('#F2F6FB')
+    HDR_BG    = colors.HexColor('#1A2F5E')
+    ABNORM_BG = colors.HexColor('#FDF2F2')
+    ABNORM_BD = colors.HexColor('#E74C3C')
+    NORM_BG   = colors.HexColor('#F2FBF5')
+    RISK_BG   = colors.HexColor('#FEF0F0') if pred == 1 else colors.HexColor('#F0FEF4')
+    RISK_BD   = RED if pred == 1 else GREEN
+    RISK_TXT  = RED if pred == 1 else GREEN
 
-    # ── Styles ──
-    styles = getSampleStyleSheet()
+    W = 17.4 * cm   # usable width
 
-    title_style = ParagraphStyle('Title', fontName='Helvetica-Bold',
-                                  fontSize=22, textColor=WHITE,
-                                  alignment=TA_CENTER, spaceAfter=4)
-    sub_style   = ParagraphStyle('Sub', fontName='Helvetica',
-                                  fontSize=11, textColor=MGRAY,
-                                  alignment=TA_CENTER, spaceAfter=2)
-    section_style = ParagraphStyle('Section', fontName='Helvetica-Bold',
-                                    fontSize=13, textColor=DARK,
-                                    spaceBefore=14, spaceAfter=6,
-                                    borderPad=4)
-    normal_style = ParagraphStyle('Normal', fontName='Helvetica',
-                                   fontSize=10, textColor=colors.HexColor('#2C3E50'),
-                                   leading=15)
-    bold_style   = ParagraphStyle('Bold', fontName='Helvetica-Bold',
-                                   fontSize=10, textColor=colors.HexColor('#2C3E50'))
-    small_style  = ParagraphStyle('Small', fontName='Helvetica',
-                                   fontSize=8, textColor=colors.HexColor('#7F8C8D'))
-    center_style = ParagraphStyle('Center', fontName='Helvetica',
-                                   fontSize=10, alignment=TA_CENTER,
-                                   textColor=colors.HexColor('#2C3E50'))
-    greeting_style = ParagraphStyle('Greeting', fontName='Helvetica-Oblique',
-                                     fontSize=11, textColor=BLUE,
-                                     leading=17, spaceAfter=8)
-    point_style  = ParagraphStyle('Point', fontName='Helvetica',
-                                   fontSize=10, textColor=colors.HexColor('#2C3E50'),
-                                   leading=15, leftIndent=10, spaceAfter=3)
+    # ── Para styles ──
+    hdr_title = ParagraphStyle('HdrTitle', fontName='Helvetica-Bold',
+        fontSize=20, textColor=WHITE, alignment=TA_LEFT, leading=24)
+    hdr_sub   = ParagraphStyle('HdrSub', fontName='Helvetica',
+        fontSize=9, textColor=colors.HexColor('#BDC3C7'), alignment=TA_LEFT, leading=13)
+    hdr_right = ParagraphStyle('HdrRight', fontName='Helvetica',
+        fontSize=9, textColor=colors.HexColor('#BDC3C7'), alignment=TA_RIGHT, leading=14)
+
+    sec_hdr   = ParagraphStyle('SecHdr', fontName='Helvetica-Bold',
+        fontSize=11, textColor=WHITE, alignment=TA_LEFT, leading=14)
+
+    lbl       = ParagraphStyle('Lbl', fontName='Helvetica-Bold',
+        fontSize=9, textColor=DGRAY, leading=13)
+    val       = ParagraphStyle('Val', fontName='Helvetica',
+        fontSize=10, textColor=NAVY, leading=13)
+
+    col_hdr   = ParagraphStyle('ColHdr', fontName='Helvetica-Bold',
+        fontSize=9.5, textColor=WHITE, alignment=TA_CENTER, leading=13)
+    col_hdr_l = ParagraphStyle('ColHdrL', fontName='Helvetica-Bold',
+        fontSize=9.5, textColor=WHITE, alignment=TA_LEFT, leading=13)
+
+    cell_param= ParagraphStyle('CellParam', fontName='Helvetica-Bold',
+        fontSize=9.5, textColor=NAVY_MID, alignment=TA_LEFT, leading=13)
+    cell_norm = ParagraphStyle('CellNorm', fontName='Helvetica',
+        fontSize=9.5, textColor=DGRAY, alignment=TA_CENTER, leading=13)
+    cell_ok   = ParagraphStyle('CellOK', fontName='Helvetica',
+        fontSize=9.5, textColor=colors.HexColor('#1A5276'), alignment=TA_CENTER, leading=13)
+    cell_bad  = ParagraphStyle('CellBad', fontName='Helvetica-Bold',
+        fontSize=9.5, textColor=RED, alignment=TA_CENTER, leading=13)
+    status_ok = ParagraphStyle('StOK', fontName='Helvetica-Bold',
+        fontSize=9, textColor=GREEN, alignment=TA_CENTER, leading=13)
+    status_bad= ParagraphStyle('StBad', fontName='Helvetica-Bold',
+        fontSize=9, textColor=RED, alignment=TA_CENTER, leading=13)
+
+    risk_main = ParagraphStyle('RiskMain', fontName='Helvetica-Bold',
+        fontSize=15, textColor=RISK_TXT, alignment=TA_CENTER, leading=20)
+    risk_prob = ParagraphStyle('RiskProb', fontName='Helvetica',
+        fontSize=10, textColor=DGRAY, alignment=TA_CENTER, leading=14)
 
     story = []
 
-    # ══ HEADER BANNER ══
-    header_data = [[
-        Paragraph("Heart Health Report", title_style),
-        Paragraph(f"Generated: {datetime.datetime.now().strftime('%d %B %Y')}", sub_style)
-    ]]
-    header_tbl = Table(header_data, colWidths=[12*cm, 5*cm])
-    header_tbl.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), DARK),
-        ('ALIGN',      (0,0), (0,0),  'LEFT'),
-        ('ALIGN',      (1,0), (1,0),  'RIGHT'),
-        ('VALIGN',     (0,0), (-1,-1),'MIDDLE'),
-        ('TOPPADDING', (0,0), (-1,-1), 14),
-        ('BOTTOMPADDING',(0,0),(-1,-1),14),
-        ('LEFTPADDING', (0,0),(0,-1), 16),
-        ('RIGHTPADDING',(1,0),(-1,-1),16),
-        ('ROUNDEDCORNERS',(0,0),(-1,-1), 8),
-    ]))
-    story.append(header_tbl)
-    story.append(Spacer(1, 0.4*cm))
-
-    # ══ PATIENT INFO ══
-    story.append(Paragraph("👤  Patient Information", section_style))
-    pat_data = [
-        [Paragraph('<b>Patient Name</b>', bold_style), Paragraph(patient_name, normal_style),
-         Paragraph('<b>Age</b>', bold_style),           Paragraph(f"{age} years", normal_style)],
-        [Paragraph('<b>Gender</b>', bold_style),         Paragraph(gender, normal_style),
-         Paragraph('<b>Report Date</b>', bold_style),    Paragraph(datetime.datetime.now().strftime('%d/%m/%Y'), normal_style)],
+    # ══════════════════════════════════════════
+    # 1. HEADER
+    # ══════════════════════════════════════════
+    now = datetime.datetime.now()
+    left_col = [
+        Paragraph("CARDIAC HEALTH REPORT", hdr_title),
+        Spacer(1, 3),
+        Paragraph("Heart Disease Risk Assessment  |  Powered by Random Forest ML", hdr_sub),
     ]
-    pat_tbl = Table(pat_data, colWidths=[3.5*cm, 5*cm, 3.5*cm, 5*cm])
-    pat_tbl.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), LGRAY),
-        ('BACKGROUND', (0,0), (0,-1), colors.HexColor('#D5E8D4')),
-        ('BACKGROUND', (2,0), (2,-1), colors.HexColor('#D5E8D4')),
-        ('GRID',       (0,0), (-1,-1), 0.5, MGRAY),
-        ('TOPPADDING', (0,0), (-1,-1), 7),
-        ('BOTTOMPADDING',(0,0),(-1,-1), 7),
-        ('LEFTPADDING', (0,0),(-1,-1), 10),
-        ('ROWBACKGROUNDS',(0,0),(-1,-1),[LGRAY, WHITE]),
+    right_col = [
+        Paragraph(f"Report Date:  {now.strftime('%d %B %Y')}", hdr_right),
+        Paragraph(f"Report Time:  {now.strftime('%I:%M %p')}", hdr_right),
+        Paragraph(f"Report ID:    RPT-{now.strftime('%Y%m%d%H%M')}", hdr_right),
+    ]
+    hdr_tbl = Table(
+        [[left_col, right_col]],
+        colWidths=[11*cm, 6.4*cm]
+    )
+    hdr_tbl.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0), (-1,-1), NAVY),
+        ('VALIGN',        (0,0), (-1,-1), 'TOP'),
+        ('TOPPADDING',    (0,0), (-1,-1), 16),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 16),
+        ('LEFTPADDING',   (0,0), (0,-1),  18),
+        ('RIGHTPADDING',  (1,0), (-1,-1), 18),
+        ('LINEBELOW',     (0,0), (-1,-1), 3, ACCENT),
     ]))
-    story.append(pat_tbl)
-    story.append(Spacer(1, 0.4*cm))
+    story.append(hdr_tbl)
+    story.append(Spacer(1, 0.35*cm))
 
-    # ══ PREDICTION RESULT ══
-    story.append(Paragraph("🩺  Prediction Result", section_style))
-    risk_txt   = "⚠  HIGH RISK — Heart Disease Detected" if pred == 1 else "✓  LOW RISK — No Heart Disease Detected"
-    risk_color = RED if pred == 1 else GREEN
-    risk_style = ParagraphStyle('Risk', fontName='Helvetica-Bold', fontSize=14,
-                                 textColor=risk_color, alignment=TA_CENTER)
-    prob_style = ParagraphStyle('Prob', fontName='Helvetica', fontSize=11,
-                                 textColor=colors.HexColor('#555'), alignment=TA_CENTER)
+    # ══════════════════════════════════════════
+    # 2. SECTION LABEL helper
+    # ══════════════════════════════════════════
+    def section_label(text):
+        tbl = Table([[Paragraph(text, sec_hdr)]], colWidths=[W])
+        tbl.setStyle(TableStyle([
+            ('BACKGROUND',    (0,0), (-1,-1), HDR_BG),
+            ('TOPPADDING',    (0,0), (-1,-1), 6),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+            ('LEFTPADDING',   (0,0), (-1,-1), 12),
+            ('LINEBELOW',     (0,0), (-1,-1), 2, ACCENT),
+        ]))
+        return tbl
 
-    result_data = [[
-        Paragraph(risk_txt, risk_style),
-        Paragraph(f"Disease Probability: {proba[1]*100:.1f}%    |    No Disease: {proba[0]*100:.1f}%", prob_style)
-    ]]
-    result_tbl = Table(result_data, colWidths=[17*cm])
-    result_tbl.setStyle(TableStyle([
+    # ══════════════════════════════════════════
+    # 3. PATIENT INFORMATION
+    # ══════════════════════════════════════════
+    story.append(section_label("  PATIENT INFORMATION"))
+    story.append(Spacer(1, 0.2*cm))
+
+    pi_data = [
+        [Paragraph("Patient Name", lbl),  Paragraph(patient_name, val),
+         Paragraph("Age",          lbl),  Paragraph(f"{age} years", val)],
+        [Paragraph("Gender",       lbl),  Paragraph(gender, val),
+         Paragraph("Report Date",  lbl),  Paragraph(now.strftime('%d/%m/%Y'), val)],
+    ]
+    pi_tbl = Table(pi_data, colWidths=[3*cm, 5.7*cm, 3*cm, 5.7*cm])
+    pi_tbl.setStyle(TableStyle([
+        ('ROWBACKGROUNDS',  (0,0), (-1,-1), [OFF_WHITE, LGRAY]),
+        ('LINEBELOW',       (0,0), (-1,-1), 0.4, MGRAY),
+        ('TOPPADDING',      (0,0), (-1,-1), 7),
+        ('BOTTOMPADDING',   (0,0), (-1,-1), 7),
+        ('LEFTPADDING',     (0,0), (-1,-1), 10),
+        ('BOX',             (0,0), (-1,-1), 0.8, MGRAY),
+    ]))
+    story.append(pi_tbl)
+    story.append(Spacer(1, 0.35*cm))
+
+    # ══════════════════════════════════════════
+    # 4. PREDICTION RESULT
+    # ══════════════════════════════════════════
+    story.append(section_label("  PREDICTION RESULT"))
+    story.append(Spacer(1, 0.2*cm))
+
+    risk_label = "HIGH RISK  —  Heart Disease Detected" if pred == 1 else "LOW RISK  —  No Heart Disease Detected"
+    risk_icon  = "ALERT" if pred == 1 else "CLEAR"
+
+    r1 = Paragraph(risk_label, risk_main)
+    r2 = Paragraph(
+        f"Disease Probability: <b>{proba[1]*100:.1f}%</b>     |     "
+        f"No Disease Probability: <b>{proba[0]*100:.1f}%</b>",
+        risk_prob
+    )
+    res_tbl = Table([[r1], [r2]], colWidths=[W])
+    res_tbl.setStyle(TableStyle([
         ('BACKGROUND',    (0,0), (-1,-1), RISK_BG),
-        ('BOX',           (0,0), (-1,-1), 2, RISK_BD),
-        ('TOPPADDING',    (0,0), (-1,-1), 14),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 14),
-        ('LEFTPADDING',   (0,0), (-1,-1), 12),
-        ('SPAN',          (0,0), (-1,-1)),
+        ('BOX',           (0,0), (-1,-1), 1.5, RISK_BD),
+        ('LINEABOVE',     (0,0), (-1,0),  3,   RISK_BD),
+        ('TOPPADDING',    (0,0), (-1,-1), 12),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 12),
+        ('ALIGN',         (0,0), (-1,-1), 'CENTER'),
     ]))
-    story.append(result_tbl)
-    story.append(Spacer(1, 0.4*cm))
+    story.append(res_tbl)
+    story.append(Spacer(1, 0.35*cm))
 
-    # ══ CLINICAL VALUES TABLE ══
-    story.append(Paragraph("📊  Clinical Values vs Normal Range", section_style))
+    # ══════════════════════════════════════════
+    # 5. CLINICAL VALUES TABLE
+    # ══════════════════════════════════════════
+    story.append(section_label("  CLINICAL VALUES  —  PATIENT RESULT vs NORMAL RANGE"))
+    story.append(Spacer(1, 0.2*cm))
 
-    # header row
-    tbl_header = [
-        Paragraph('<b>Parameter</b>',   bold_style),
-        Paragraph('<b>Patient Value</b>', bold_style),
-        Paragraph('<b>Normal Range</b>', bold_style),
-        Paragraph('<b>Status</b>',       bold_style),
+    # Column headers
+    col_headers = [
+        Paragraph("PARAMETER",     col_hdr_l),
+        Paragraph("PATIENT VALUE", col_hdr),
+        Paragraph("NORMAL RANGE",  col_hdr),
+        Paragraph("STATUS",        col_hdr),
     ]
-
-    chest_display = chest_pain
 
     rows_raw = [
-        ('Age',              f"{age} years",          '18–55 years',        age > 55),
-        ('Resting BP',       f"{resting_bp} mmHg",    '90–120 mmHg',        resting_bp > 120),
-        ('Cholesterol',      f"{cholesterol} mg/dl",  '< 200 mg/dl',        cholesterol >= 200),
-        ('Max Heart Rate',   f"{max_hr} bpm",         '100–170 bpm',        max_hr < 100 or max_hr > 170),
-        ('Oldpeak (ST Dep)', f"{oldpeak}",             '0.0 – 1.0',         oldpeak > 1.0),
-        ('Fasting Blood Sugar', fasting_bs,           '< 120 mg/dl (No)',   fasting_bs == 'Yes'),
-        ('Resting ECG',      resting_ecg,              'NORMAL',             resting_ecg != 'NORMAL'),
-        ('Chest Pain Type',  chest_display,            'ATA / NAP / TA',     chest_display == 'Asymptomatic'),
-        ('Exercise Angina',  ex_angina,                'No',                 ex_angina == 'Yes'),
-        ('ST Slope',         st_slope,                 'UP',                 st_slope in ['FLAT','DOWN']),
+        ("Age",                  f"{age} years",         "18 – 55 years",       age > 55),
+        ("Resting Blood Pressure", f"{resting_bp} mmHg", "90 – 120 mmHg",       resting_bp > 120),
+        ("Cholesterol",          f"{cholesterol} mg/dl",  "< 200 mg/dl",         cholesterol >= 200),
+        ("Max Heart Rate",       f"{max_hr} bpm",         "100 – 170 bpm",       max_hr < 100 or max_hr > 170),
+        ("Oldpeak (ST Depression)", f"{oldpeak}",         "0.0 – 1.0",           oldpeak > 1.0),
+        ("Fasting Blood Sugar",  fasting_bs,              "< 120 mg/dl  (No)",   fasting_bs == "Yes"),
+        ("Resting ECG",          resting_ecg,             "NORMAL",              resting_ecg != "NORMAL"),
+        ("Chest Pain Type",      chest_pain,              "ATA / NAP / TA",      chest_pain == "Asymptomatic"),
+        ("Exercise Induced Angina", ex_angina,            "No",                  ex_angina == "Yes"),
+        ("ST Slope",             st_slope,                "UP",                  st_slope in ["FLAT","DOWN"]),
     ]
 
-    tbl_data = [tbl_header]
-    row_styles = []
+    tbl_data = [col_headers]
+    row_cmds = []
 
-    for i, (param, value, normal, is_bad) in enumerate(rows_raw):
-        status_txt   = '⚠ Abnormal' if is_bad else '✓ Normal'
-        status_color = RED if is_bad else GREEN
-        st_style = ParagraphStyle('St', fontName='Helvetica-Bold', fontSize=10,
-                                   textColor=status_color, alignment=TA_CENTER)
-        val_style = ParagraphStyle('Val', fontName='Helvetica-Bold' if is_bad else 'Helvetica',
-                                    fontSize=10,
-                                    textColor=RED if is_bad else colors.HexColor('#2C3E50'),
-                                    alignment=TA_CENTER)
+    for i, (param, pval, nrange, is_bad) in enumerate(rows_raw):
+        v_style = cell_bad  if is_bad else cell_ok
+        s_style = status_bad if is_bad else status_ok
+        s_text  = "ABNORMAL" if is_bad else "NORMAL"
+
         tbl_data.append([
-            Paragraph(param, normal_style),
-            Paragraph(value, val_style),
-            Paragraph(normal, center_style),
-            Paragraph(status_txt, st_style),
+            Paragraph(param,   cell_param),
+            Paragraph(pval,    v_style),
+            Paragraph(nrange,  cell_norm),
+            Paragraph(s_text,  s_style),
         ])
-        # alternate row background + highlight abnormal
-        bg = colors.HexColor('#FEF9E7') if is_bad else (LGRAY if i % 2 == 0 else WHITE)
-        row_styles.append(('BACKGROUND', (0, i+1), (-1, i+1), bg))
+        ri = i + 1
+        bg = ABNORM_BG if is_bad else (ROW_ALT if i % 2 == 0 else OFF_WHITE)
+        row_cmds.append(("BACKGROUND", (0, ri), (-1, ri), bg))
         if is_bad:
-            row_styles.append(('BOX', (0, i+1), (-1, i+1), 1, colors.HexColor('#F39C12')))
+            row_cmds.append(("LINEBEFORE",  (0, ri), (0,  ri), 3, RED))
+        else:
+            row_cmds.append(("LINEBEFORE",  (0, ri), (0,  ri), 3, GREEN))
 
-    clin_tbl = Table(tbl_data, colWidths=[4.5*cm, 3.5*cm, 4.5*cm, 4.5*cm])
-    base_style = [
-        ('BACKGROUND',    (0,0), (-1,0),  DARK),
-        ('TEXTCOLOR',     (0,0), (-1,0),  WHITE),
-        ('FONTNAME',      (0,0), (-1,0),  'Helvetica-Bold'),
-        ('FONTSIZE',      (0,0), (-1,0),  10),
-        ('ALIGN',         (1,0), (-1,-1), 'CENTER'),
-        ('ALIGN',         (0,0), (0,-1),  'LEFT'),
-        ('GRID',          (0,0), (-1,-1), 0.4, MGRAY),
-        ('TOPPADDING',    (0,0), (-1,-1), 7),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 7),
-        ('LEFTPADDING',   (0,0), (-1,-1), 10),
-        ('ROWBACKGROUNDS',(0,1),(-1,-1), [LGRAY, WHITE]),
-    ]
-    clin_tbl.setStyle(TableStyle(base_style + row_styles))
+    clin_tbl = Table(tbl_data, colWidths=[5.2*cm, 3.6*cm, 4.6*cm, 4*cm])
+    clin_tbl.setStyle(TableStyle([
+        # Header row
+        ("BACKGROUND",    (0,0), (-1,0),  HDR_BG),
+        ("TOPPADDING",    (0,0), (-1,0),  8),
+        ("BOTTOMPADDING", (0,0), (-1,0),  8),
+        ("LEFTPADDING",   (0,0), (0,0),   12),
+        # Data rows
+        ("TOPPADDING",    (0,1), (-1,-1), 7),
+        ("BOTTOMPADDING", (0,1), (-1,-1), 7),
+        ("LEFTPADDING",   (0,1), (-1,-1), 10),
+        ("ALIGN",         (1,0), (-1,-1), "CENTER"),
+        ("ALIGN",         (0,0), (0,-1),  "LEFT"),
+        # Grid
+        ("LINEBELOW",     (0,0), (-1,-1), 0.3, MGRAY),
+        ("BOX",           (0,0), (-1,-1), 0.8, MGRAY),
+    ] + row_cmds))
     story.append(clin_tbl)
-    story.append(Spacer(1, 0.4*cm))
+    story.append(Spacer(1, 0.3*cm))
 
-    # ══ AI RECOMMENDATIONS ══
-    story.append(Paragraph("💡  Personalised Health Recommendations", section_style))
-
-    if ai_sections.get('GREETING'):
-        story.append(Paragraph(ai_sections['GREETING'].strip(), greeting_style))
-
-    section_icons = {
-        'DIET'    : ('🥗', 'Diet & Nutrition'),
-        'EXERCISE': ('🏃', 'Exercise & Activity'),
-        'HABITS'  : ('🌙', 'Daily Habits'),
-        'AVOID'   : ('🚫', 'Things to Avoid'),
-        'MONITOR' : ('📋', 'Monitor & Follow-up'),
-    }
-    point_emojis_pdf = {
-        'DIET'    : ['•','•','•','•'],
-        'EXERCISE': ['•','•','•'],
-        'HABITS'  : ['•','•','•'],
-        'AVOID'   : ['•','•','•'],
-        'MONITOR' : ['•','•'],
-    }
-
-    for key, (icon, title) in section_icons.items():
-        points = ai_sections.get(key, [])
-        if not points:
-            continue
-        sec_hdr = ParagraphStyle(f'SecHdr_{key}', fontName='Helvetica-Bold',
-                                   fontSize=11, textColor=BLUE,
-                                   spaceBefore=10, spaceAfter=4)
-        story.append(Paragraph(f"{icon}  {title}", sec_hdr))
-        for pt in points:
-            story.append(Paragraph(f"   • {pt}", point_style))
-
-    story.append(Spacer(1, 0.5*cm))
-
-    # ══ FOOTER ══
-    story.append(HRFlowable(width='100%', thickness=0.5, color=MGRAY))
-    story.append(Spacer(1, 0.2*cm))
-    footer_txt = "This report is generated for health awareness purposes. Please consult a qualified cardiologist for medical diagnosis and treatment."
-    story.append(Paragraph(footer_txt, ParagraphStyle('Footer', fontName='Helvetica-Oblique',
-                                                        fontSize=8, textColor=MGRAY,
-                                                        alignment=TA_CENTER)))
+    # ══════════════════════════════════════════
+    # 6. LEGEND
+    # ══════════════════════════════════════════
+    legend_data = [[
+        Paragraph("<font color='#1E8449'><b>  NORMAL</b></font>  Value is within healthy range", 
+                  ParagraphStyle("lg", fontName="Helvetica", fontSize=8.5, textColor=DGRAY)),
+        Paragraph("<font color='#C0392B'><b>  ABNORMAL</b></font>  Value is outside healthy range — requires attention",
+                  ParagraphStyle("lg2", fontName="Helvetica", fontSize=8.5, textColor=DGRAY)),
+    ]]
+    leg_tbl = Table(legend_data, colWidths=[W/2, W/2])
+    leg_tbl.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,-1), LGRAY),
+        ("BOX",           (0,0), (-1,-1), 0.5, MGRAY),
+        ("TOPPADDING",    (0,0), (-1,-1), 5),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+        ("LEFTPADDING",   (0,0), (-1,-1), 10),
+    ]))
+    story.append(leg_tbl)
 
     doc.build(story)
     buffer.seek(0)
