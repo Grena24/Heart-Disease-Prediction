@@ -6,6 +6,10 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, roc_auc_score
 from groq import Groq
+import shap
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import warnings
 import io
 import datetime
@@ -163,9 +167,9 @@ def load_model():
     acc = round(accuracy_score(y_test, model.predict(X_test)) * 100, 1)
     auc = round(roc_auc_score(y_test, model.predict_proba(X_test)[:, 1]), 3)
 
-    return model, encoders, acc, auc, feature_names
+    return model, encoders, acc, auc, feature_names, X_train
 
-model, encoders, model_acc, model_auc, feature_names = load_model()
+model, encoders, model_acc, model_auc, feature_names, X_train_bg = load_model()
 
 # ─────────────────────────────────────────────────────────────
 # NORMAL RANGES reference
@@ -527,6 +531,125 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
     return buffer
 
 # ─────────────────────────────────────────────────────────────
+# SHAP EXPLAINABILITY
+# ─────────────────────────────────────────────────────────────
+
+# Human-readable labels for feature names
+FEATURE_LABELS = {
+    'Age'               : 'Age',
+    'Gender'            : 'Gender',
+    'ChestPainType'     : 'Chest Pain Type',
+    'RestingBP'         : 'Resting Blood Pressure',
+    'RestingBloodPressure': 'Resting Blood Pressure',
+    'Cholesterol'       : 'Cholesterol',
+    'FastingBS'         : 'Fasting Blood Sugar',
+    'FastingBloodSugar' : 'Fasting Blood Sugar',
+    'RestingECG'        : 'Resting ECG',
+    'MaxHR'             : 'Max Heart Rate',
+    'ExerciseAngina'    : 'Exercise Angina',
+    'Oldpeak'           : 'Oldpeak (ST Depression)',
+    'ST_Slope'          : 'ST Slope',
+}
+
+def render_shap_explanation(model, X_train_bg, input_data, feature_names, pred, proba):
+    st.markdown("<div class='section-header'>🔬 SHAP Explainability — Why This Prediction?</div>",
+                unsafe_allow_html=True)
+
+    st.markdown("""
+    <div style='background:rgba(52,152,219,0.08);border:1px solid rgba(52,152,219,0.3);
+    border-radius:12px;padding:1rem 1.5rem;margin-bottom:1rem;color:#adb5bd;font-size:0.95rem;'>
+    <b style='color:#74b9ff;'>What is SHAP?</b><br>
+    SHAP (SHapley Additive exPlanations) explains <i>why</i> the model made this prediction —
+    which features pushed the risk <span style='color:#e74c3c;'>higher ↑</span> and which pushed it
+    <span style='color:#2ecc71;'>lower ↓</span> for this specific patient.
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.spinner("🔬 Computing SHAP values..."):
+        # Use a small background sample for speed
+        bg_sample  = shap.sample(X_train_bg, 100, random_state=42)
+        explainer  = shap.TreeExplainer(model, bg_sample)
+        shap_vals  = explainer(input_data)
+
+        # For binary classification, take class-1 (disease) SHAP values
+        if hasattr(shap_vals, 'values') and shap_vals.values.ndim == 3:
+            sv = shap_vals.values[0, :, 1]   # shape: (n_features,) for class 1
+        else:
+            sv = shap_vals.values[0]
+
+        # Build readable labels
+        labels = [FEATURE_LABELS.get(f, f) for f in feature_names]
+
+        # Sort by absolute impact
+        order      = sorted(range(len(sv)), key=lambda i: abs(sv[i]), reverse=True)
+        sv_sorted  = [sv[i]     for i in order]
+        lab_sorted = [labels[i] for i in order]
+        colors_bar = ['#e74c3c' if v > 0 else '#2ecc71' for v in sv_sorted]
+
+        # ── Plot ──────────────────────────────────────────────
+        fig, ax = plt.subplots(figsize=(8, 4.5))
+        fig.patch.set_facecolor('#0f0c29')
+        ax.set_facecolor('#1a1a2e')
+
+        bars = ax.barh(lab_sorted[::-1], sv_sorted[::-1],
+                       color=colors_bar[::-1], edgecolor='none', height=0.6)
+
+        # Value labels on bars
+        for bar, val in zip(bars, sv_sorted[::-1]):
+            x_pos = bar.get_width()
+            align = 'left' if x_pos >= 0 else 'right'
+            offset = 0.002 if x_pos >= 0 else -0.002
+            ax.text(x_pos + offset, bar.get_y() + bar.get_height()/2,
+                    f'{val:+.3f}', va='center', ha=align,
+                    color='white', fontsize=8.5, fontweight='bold')
+
+        ax.axvline(0, color='#ffffff44', linewidth=1)
+        ax.set_xlabel('SHAP Value  (impact on heart disease risk)', color='#adb5bd', fontsize=9)
+        ax.set_title('Feature Impact on Prediction', color='white', fontsize=11, fontweight='bold', pad=10)
+        ax.tick_params(colors='#adb5bd', labelsize=9)
+        for spine in ax.spines.values():
+            spine.set_edgecolor('#ffffff22')
+        ax.xaxis.label.set_color('#adb5bd')
+
+        # Legend
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor='#e74c3c', label='↑ Increases disease risk'),
+            Patch(facecolor='#2ecc71', label='↓ Decreases disease risk'),
+        ]
+        ax.legend(handles=legend_elements, loc='lower right',
+                  facecolor='#1a1a2e', edgecolor='#ffffff22',
+                  labelcolor='white', fontsize=8.5)
+
+        plt.tight_layout()
+        st.pyplot(fig, use_container_width=True)
+        plt.close(fig)
+
+        # ── Top 3 plain-English explanation ───────────────────
+        st.markdown("#### 🧠 Plain English Explanation")
+
+        top3 = order[:3]
+        explanation_html = "<div class='ai-box' style='padding:1.2rem 1.5rem;'>"
+        for rank, idx in enumerate(top3, 1):
+            direction = "increased" if sv[idx] > 0 else "decreased"
+            color     = "#e74c3c"   if sv[idx] > 0 else "#2ecc71"
+            arrow     = "↑"         if sv[idx] > 0 else "↓"
+            label     = labels[idx]
+            impact    = abs(sv[idx])
+            strength  = "strongly" if impact > 0.1 else "slightly"
+
+            explanation_html += f"""
+            <div class='ai-point' style='margin-bottom:0.6rem;'>
+              <span class='ai-point-emoji'>{'🔴' if sv[idx]>0 else '🟢'}</span>
+              <span><b style='color:{color};'>{arrow} {label}</b>
+              {strength} <b style='color:{color};'>{direction}</b> the heart disease risk
+              for this patient <span style='color:#adb5bd;font-size:0.85rem;'>(impact score: {sv[idx]:+.3f})</span>
+              </span>
+            </div>"""
+        explanation_html += "</div>"
+        st.markdown(explanation_html, unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────
 # SIDEBAR
 # ─────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -709,6 +832,10 @@ if predict_btn:
         ]
     })
     st.dataframe(summary_df, use_container_width=True, hide_index=True)
+    st.markdown("---")
+
+    # SHAP Explainability
+    render_shap_explanation(model, X_train_bg, input_data, feature_names, pred, proba)
     st.markdown("---")
 
     # AI Recommendations
