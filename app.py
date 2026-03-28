@@ -1,7 +1,10 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import pickle
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, roc_auc_score
 from groq import Groq
 import warnings
 import io
@@ -121,30 +124,46 @@ section[data-testid="stSidebar"] {
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────
-# FIX 1 & 2 — LOAD FROM PKL (with column-name sanity check)
+# LOAD & TRAIN MODEL
+# Retrains from CSV every startup — avoids pickle version errors
+# between local Python and Streamlit Cloud. Fast due to caching.
 # ─────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    # ── FIX 2: Load the saved pkl bundle instead of retraining ──
-    with open("heart_failure_model.pkl", "rb") as f:
-        bundle = pickle.load(f)
+    df = pd.read_csv("cleaned_heart.csv")
 
-    model         = bundle["model"]
-    encoders      = bundle["encoders"]
-    model_acc     = bundle["accuracy"]
-    model_auc     = bundle["auc"]
-    feature_names = bundle["feature_names"]
+    # Drop extra columns if present
+    for col in ['AgeGroup', 'BP_Category']:
+        if col in df.columns:
+            df = df.drop(columns=[col])
 
-    # ── FIX 3: Sanity check — verify feature names match ──
-    expected = list(model.feature_names_in_)
-    if expected != feature_names:
-        st.warning(
-            f"⚠️ Feature name mismatch!\n"
-            f"Model expects: {expected}\n"
-            f"Bundle stored: {feature_names}"
-        )
+    # Fix cholesterol zeros (missing data entered as 0)
+    df['Cholesterol'] = df['Cholesterol'].replace(0, df['Cholesterol'].median())
 
-    return model, encoders, model_acc, model_auc, feature_names
+    # Encode categoricals
+    cat_features = ['Gender', 'ChestPainType', 'RestingECG', 'ExerciseAngina', 'ST_Slope']
+    le       = LabelEncoder()
+    encoders = {}
+    for col in cat_features:
+        df[col] = le.fit_transform(df[col])
+        encoders[col] = dict(zip(le.classes_, le.transform(le.classes_)))
+
+    X = df.drop(columns=['HeartDisease'])
+    y = df['HeartDisease']
+
+    feature_names = list(X.columns)  # store exact column order
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+
+    model = RandomForestClassifier(n_estimators=200, random_state=42)
+    model.fit(X_train, y_train)
+
+    acc = round(accuracy_score(y_test, model.predict(X_test)) * 100, 1)
+    auc = round(roc_auc_score(y_test, model.predict_proba(X_test)[:, 1]), 3)
+
+    return model, encoders, acc, auc, feature_names
 
 model, encoders, model_acc, model_auc, feature_names = load_model()
 
@@ -152,16 +171,16 @@ model, encoders, model_acc, model_auc, feature_names = load_model()
 # NORMAL RANGES reference
 # ─────────────────────────────────────────────────────────────
 NORMAL_RANGES = {
-    'Age'               : {'normal': '18–55 years',        'flag': lambda v: v > 55},
-    'Resting BP'        : {'normal': '90–120 mmHg',        'flag': lambda v: v > 120},
-    'Cholesterol'       : {'normal': '< 200 mg/dl',        'flag': lambda v: v >= 200},
-    'Max Heart Rate'    : {'normal': '100–170 bpm',        'flag': lambda v: v < 100},
-    'Oldpeak'           : {'normal': '0.0–1.0',            'flag': lambda v: v > 1.0},
+    'Age'                : {'normal': '18–55 years',       'flag': lambda v: v > 55},
+    'Resting BP'         : {'normal': '90–120 mmHg',       'flag': lambda v: v > 120},
+    'Cholesterol'        : {'normal': '< 200 mg/dl',       'flag': lambda v: v >= 200},
+    'Max Heart Rate'     : {'normal': '100–170 bpm',       'flag': lambda v: v < 100},
+    'Oldpeak'            : {'normal': '0.0–1.0',           'flag': lambda v: v > 1.0},
     'Fasting Blood Sugar': {'normal': '< 120 mg/dl (No)', 'flag': lambda v: v == 'Yes'},
-    'Resting ECG'       : {'normal': 'NORMAL',             'flag': lambda v: v != 'NORMAL'},
-    'Chest Pain'        : {'normal': 'ATA / NAP / TA',    'flag': lambda v: v == 'Asymptomatic'},
-    'Exercise Angina'   : {'normal': 'No',                 'flag': lambda v: v == 'Yes'},
-    'ST Slope'          : {'normal': 'UP',                 'flag': lambda v: v in ['FLAT', 'DOWN']},
+    'Resting ECG'        : {'normal': 'NORMAL',            'flag': lambda v: v != 'NORMAL'},
+    'Chest Pain'         : {'normal': 'ATA / NAP / TA',   'flag': lambda v: v == 'Asymptomatic'},
+    'Exercise Angina'    : {'normal': 'No',                'flag': lambda v: v == 'Yes'},
+    'ST Slope'           : {'normal': 'UP',                'flag': lambda v: v in ['FLAT', 'DOWN']},
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -175,7 +194,7 @@ def get_ai_recommendation(patient_name, age, gender, chest_pain, bp,
     except Exception:
         raise ValueError("GROQ_API_KEY not found. Add it in Streamlit Cloud → App Settings → Secrets.")
 
-    client   = Groq(api_key=api_key)
+    client       = Groq(api_key=api_key)
     risk_level   = "HIGH RISK — Heart Disease Detected" if prediction == 1 else "LOW RISK — No Heart Disease"
     disease_prob = f"{probability[1]*100:.1f}%"
 
@@ -287,7 +306,7 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
     doc    = SimpleDocTemplate(
         buffer, pagesize=A4,
         leftMargin=1.8*cm, rightMargin=1.8*cm,
-        topMargin=1.5*cm, bottomMargin=1.5*cm
+        topMargin=1.5*cm,  bottomMargin=1.5*cm
     )
 
     NAVY     = colors.HexColor('#0D1B3E')
@@ -303,47 +322,29 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
     ROW_ALT  = colors.HexColor('#F2F6FB')
     HDR_BG   = colors.HexColor('#1A2F5E')
     ABNORM_BG= colors.HexColor('#FDF2F2')
-    NORM_BG  = colors.HexColor('#F2FBF5')
     RISK_BG  = colors.HexColor('#FEF0F0') if pred == 1 else colors.HexColor('#F0FEF4')
-    RISK_BD  = RED  if pred == 1 else GREEN
-    RISK_TXT = RED  if pred == 1 else GREEN
+    RISK_BD  = RED   if pred == 1 else GREEN
+    RISK_TXT = RED   if pred == 1 else GREEN
     W        = 17.4 * cm
 
-    hdr_title = ParagraphStyle('HdrTitle', fontName='Helvetica-Bold',
-                               fontSize=20, textColor=WHITE, alignment=TA_LEFT, leading=24)
-    hdr_sub   = ParagraphStyle('HdrSub',   fontName='Helvetica',
-                               fontSize=9,  textColor=colors.HexColor('#BDC3C7'), alignment=TA_LEFT, leading=13)
-    hdr_right = ParagraphStyle('HdrRight', fontName='Helvetica',
-                               fontSize=9,  textColor=colors.HexColor('#BDC3C7'), alignment=TA_RIGHT, leading=14)
-    sec_hdr   = ParagraphStyle('SecHdr',   fontName='Helvetica-Bold',
-                               fontSize=11, textColor=WHITE, alignment=TA_LEFT, leading=14)
-    lbl       = ParagraphStyle('Lbl',      fontName='Helvetica-Bold',
-                               fontSize=9,  textColor=DGRAY, leading=13)
-    val       = ParagraphStyle('Val',      fontName='Helvetica',
-                               fontSize=10, textColor=NAVY, leading=13)
-    col_hdr   = ParagraphStyle('ColHdr',   fontName='Helvetica-Bold',
-                               fontSize=9.5,textColor=WHITE, alignment=TA_CENTER, leading=13)
-    col_hdr_l = ParagraphStyle('ColHdrL',  fontName='Helvetica-Bold',
-                               fontSize=9.5,textColor=WHITE, alignment=TA_LEFT, leading=13)
-    cell_param= ParagraphStyle('CellParam',fontName='Helvetica-Bold',
-                               fontSize=9.5,textColor=NAVY_MID, alignment=TA_LEFT, leading=13)
-    cell_norm = ParagraphStyle('CellNorm', fontName='Helvetica',
-                               fontSize=9.5,textColor=DGRAY, alignment=TA_CENTER, leading=13)
-    cell_ok   = ParagraphStyle('CellOK',   fontName='Helvetica',
-                               fontSize=9.5,textColor=colors.HexColor('#1A5276'), alignment=TA_CENTER, leading=13)
-    cell_bad  = ParagraphStyle('CellBad',  fontName='Helvetica-Bold',
-                               fontSize=9.5,textColor=RED, alignment=TA_CENTER, leading=13)
-    status_ok = ParagraphStyle('StOK',     fontName='Helvetica-Bold',
-                               fontSize=9,  textColor=GREEN, alignment=TA_CENTER, leading=13)
-    status_bad= ParagraphStyle('StBad',    fontName='Helvetica-Bold',
-                               fontSize=9,  textColor=RED, alignment=TA_CENTER, leading=13)
-    risk_main = ParagraphStyle('RiskMain', fontName='Helvetica-Bold',
-                               fontSize=15, textColor=RISK_TXT, alignment=TA_CENTER, leading=20)
-    risk_prob = ParagraphStyle('RiskProb', fontName='Helvetica',
-                               fontSize=10, textColor=DGRAY, alignment=TA_CENTER, leading=14)
+    hdr_title  = ParagraphStyle('HdrTitle', fontName='Helvetica-Bold', fontSize=20, textColor=WHITE,  alignment=TA_LEFT,   leading=24)
+    hdr_sub    = ParagraphStyle('HdrSub',   fontName='Helvetica',      fontSize=9,  textColor=colors.HexColor('#BDC3C7'), alignment=TA_LEFT,  leading=13)
+    hdr_right  = ParagraphStyle('HdrRight', fontName='Helvetica',      fontSize=9,  textColor=colors.HexColor('#BDC3C7'), alignment=TA_RIGHT, leading=14)
+    sec_hdr    = ParagraphStyle('SecHdr',   fontName='Helvetica-Bold', fontSize=11, textColor=WHITE,  alignment=TA_LEFT,   leading=14)
+    lbl        = ParagraphStyle('Lbl',      fontName='Helvetica-Bold', fontSize=9,  textColor=DGRAY,  leading=13)
+    val        = ParagraphStyle('Val',      fontName='Helvetica',      fontSize=10, textColor=NAVY,   leading=13)
+    col_hdr    = ParagraphStyle('ColHdr',   fontName='Helvetica-Bold', fontSize=9.5,textColor=WHITE,  alignment=TA_CENTER, leading=13)
+    col_hdr_l  = ParagraphStyle('ColHdrL',  fontName='Helvetica-Bold', fontSize=9.5,textColor=WHITE,  alignment=TA_LEFT,   leading=13)
+    cell_param = ParagraphStyle('CellParam',fontName='Helvetica-Bold', fontSize=9.5,textColor=NAVY_MID,alignment=TA_LEFT,  leading=13)
+    cell_norm  = ParagraphStyle('CellNorm', fontName='Helvetica',      fontSize=9.5,textColor=DGRAY,  alignment=TA_CENTER, leading=13)
+    cell_ok    = ParagraphStyle('CellOK',   fontName='Helvetica',      fontSize=9.5,textColor=colors.HexColor('#1A5276'), alignment=TA_CENTER, leading=13)
+    cell_bad   = ParagraphStyle('CellBad',  fontName='Helvetica-Bold', fontSize=9.5,textColor=RED,    alignment=TA_CENTER, leading=13)
+    status_ok  = ParagraphStyle('StOK',     fontName='Helvetica-Bold', fontSize=9,  textColor=GREEN,  alignment=TA_CENTER, leading=13)
+    status_bad = ParagraphStyle('StBad',    fontName='Helvetica-Bold', fontSize=9,  textColor=RED,    alignment=TA_CENTER, leading=13)
+    risk_main  = ParagraphStyle('RiskMain', fontName='Helvetica-Bold', fontSize=15, textColor=RISK_TXT,alignment=TA_CENTER,leading=20)
+    risk_prob  = ParagraphStyle('RiskProb', fontName='Helvetica',      fontSize=10, textColor=DGRAY,  alignment=TA_CENTER, leading=14)
 
     story = []
-
     IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
     now = datetime.datetime.now(IST)
 
@@ -353,8 +354,8 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
         Paragraph("Heart Disease Risk Assessment | Powered by Random Forest ML", hdr_sub),
     ]
     right_col = [
-        Paragraph(f"Report Date: {now.strftime('%d %B %Y')}", hdr_right),
-        Paragraph(f"Report Time: {now.strftime('%I:%M %p')}",  hdr_right),
+        Paragraph(f"Report Date: {now.strftime('%d %B %Y')}",     hdr_right),
+        Paragraph(f"Report Time: {now.strftime('%I:%M %p')}",      hdr_right),
         Paragraph(f"Report ID: RPT-{now.strftime('%Y%m%d%H%M')}", hdr_right),
     ]
     hdr_tbl = Table([[left_col, right_col]], colWidths=[11*cm, 6.4*cm])
@@ -412,7 +413,7 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
         f"No Disease Probability: <b>{proba[0]*100:.1f}%</b>",
         risk_prob
     )
-    res_tbl = Table([[r1], [r2]], colWidths=[W])
+    res_tbl = Table([[r1],[r2]], colWidths=[W])
     res_tbl.setStyle(TableStyle([
         ('BACKGROUND',    (0,0), (-1,-1), RISK_BG),
         ('BOX',           (0,0), (-1,-1), 1.5, RISK_BD),
@@ -434,16 +435,16 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
         Paragraph("STATUS",        col_hdr),
     ]
     rows_raw = [
-        ("Age",                   f"{age} years",       "18 – 55 years",       age > 55),
-        ("Resting Blood Pressure",f"{resting_bp} mmHg", "90 – 120 mmHg",       resting_bp > 120),
-        ("Cholesterol",           f"{cholesterol} mg/dl","< 200 mg/dl",         cholesterol >= 200),
-        ("Max Heart Rate",        f"{max_hr} bpm",       "100 – 170 bpm",       max_hr < 100 or max_hr > 170),
-        ("Oldpeak (ST Depression)",f"{oldpeak}",         "0.0 – 1.0",           oldpeak > 1.0),
-        ("Fasting Blood Sugar",    fasting_bs,           "< 120 mg/dl (No)",    fasting_bs == "Yes"),
-        ("Resting ECG",            resting_ecg,          "NORMAL",              resting_ecg != "NORMAL"),
-        ("Chest Pain Type",        chest_pain,           "ATA / NAP / TA",      chest_pain == "Asymptomatic"),
-        ("Exercise Induced Angina",ex_angina,            "No",                  ex_angina == "Yes"),
-        ("ST Slope",               st_slope,             "UP",                  st_slope in ["FLAT","DOWN"]),
+        ("Age",                    f"{age} years",        "18 – 55 years",    age > 55),
+        ("Resting Blood Pressure", f"{resting_bp} mmHg",  "90 – 120 mmHg",    resting_bp > 120),
+        ("Cholesterol",            f"{cholesterol} mg/dl", "< 200 mg/dl",      cholesterol >= 200),
+        ("Max Heart Rate",         f"{max_hr} bpm",        "100 – 170 bpm",    max_hr < 100 or max_hr > 170),
+        ("Oldpeak (ST Depression)",f"{oldpeak}",           "0.0 – 1.0",        oldpeak > 1.0),
+        ("Fasting Blood Sugar",     fasting_bs,            "< 120 mg/dl (No)", fasting_bs == "Yes"),
+        ("Resting ECG",             resting_ecg,           "NORMAL",           resting_ecg != "NORMAL"),
+        ("Chest Pain Type",         chest_pain,            "ATA / NAP / TA",   chest_pain == "Asymptomatic"),
+        ("Exercise Induced Angina", ex_angina,             "No",               ex_angina == "Yes"),
+        ("ST Slope",                st_slope,              "UP",               st_slope in ["FLAT","DOWN"]),
     ]
     tbl_data = [col_headers]
     row_cmds = []
@@ -460,7 +461,7 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
         ri = i + 1
         bg = ABNORM_BG if is_bad else (ROW_ALT if i % 2 == 0 else OFF_WHITE)
         row_cmds.append(("BACKGROUND", (0, ri), (-1, ri), bg))
-        row_cmds.append(("LINEBEFORE", (0, ri), (0, ri), 3, RED if is_bad else GREEN))
+        row_cmds.append(("LINEBEFORE", (0, ri), (0, ri),  3, RED if is_bad else GREEN))
 
     clin_tbl = Table(tbl_data, colWidths=[5.2*cm, 3.6*cm, 4.6*cm, 4*cm])
     clin_tbl.setStyle(TableStyle([
@@ -499,10 +500,8 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
 
     # High risk notice
     if pred == 1:
-        alert_style = ParagraphStyle('Alert',    fontName='Helvetica-Bold',
-                                     fontSize=11, textColor=WHITE, alignment=TA_CENTER, leading=16)
-        alert_sub   = ParagraphStyle('AlertSub', fontName='Helvetica',
-                                     fontSize=9.5,textColor=colors.HexColor('#FDEDEC'), alignment=TA_CENTER, leading=14)
+        alert_style = ParagraphStyle('Alert',    fontName='Helvetica-Bold', fontSize=11, textColor=WHITE, alignment=TA_CENTER, leading=16)
+        alert_sub   = ParagraphStyle('AlertSub', fontName='Helvetica',      fontSize=9.5,textColor=colors.HexColor('#FDEDEC'), alignment=TA_CENTER, leading=14)
         alert_data  = [
             [Paragraph("IMPORTANT — HIGH RISK DETECTED", alert_style)],
             [Paragraph(
@@ -579,13 +578,13 @@ with col1:
 
 with col2:
     st.markdown("**🫀 Heart Metrics**")
-    chest      = st.selectbox("Chest Pain Type", ["ASY - Asymptomatic",
-                                                    "ATA - Atypical Angina",
-                                                    "NAP - Non-Anginal Pain",
-                                                    "TA - Typical Angina"])
-    max_hr     = st.slider("Max Heart Rate", 50, 250, 140)
-    ex_angina  = st.selectbox("Exercise Induced Angina", ["No", "Yes"])
-    oldpeak    = st.number_input("Oldpeak (ST Depression)", 0.0, 10.0, 1.0, step=0.1)
+    chest     = st.selectbox("Chest Pain Type", ["ASY - Asymptomatic",
+                                                   "ATA - Atypical Angina",
+                                                   "NAP - Non-Anginal Pain",
+                                                   "TA - Typical Angina"])
+    max_hr    = st.slider("Max Heart Rate", 50, 250, 140)
+    ex_angina = st.selectbox("Exercise Induced Angina", ["No", "Yes"])
+    oldpeak   = st.number_input("Oldpeak (ST Depression)", 0.0, 10.0, 1.0, step=0.1)
 
 with col3:
     st.markdown("**🩺 Clinical Measurements**")
@@ -607,7 +606,7 @@ if max_hr < 60:
     st.warning("⚠️ Max Heart Rate below 60 bpm is unusually low. Please double-check the value.")
 
 # ─────────────────────────────────────────────────────────────
-# ENCODE INPUTS  ← FIX 1: column name uses 'RestingBP' to match CSV
+# ENCODE INPUTS — uses exact feature_names order from training
 # ─────────────────────────────────────────────────────────────
 gender_enc  = encoders['Gender']['M']         if gender    == "Male" else encoders['Gender']['F']
 chest_enc   = encoders['ChestPainType'][chest.split(" ")[0].strip()]
@@ -616,20 +615,12 @@ angina_enc  = encoders['ExerciseAngina']['Y'] if ex_angina == "Yes"  else encode
 slope_enc   = encoders['ST_Slope'][st_slope]
 fasting_enc = 1 if fasting_bs == "Yes" else 0
 
-# ── FIX 1: Build input_data with the EXACT column order the model was trained on ──
+# Build DataFrame using exact feature_names order from training
 input_data = pd.DataFrame([{
-    col: val for col, val in zip(feature_names, [
-        age,
-        gender_enc,
-        chest_enc,
-        float(resting_bp),
-        float(cholesterol),
-        fasting_enc,
-        ecg_enc,
-        max_hr,
-        angina_enc,
-        float(oldpeak),
-        slope_enc
+    col: v for col, v in zip(feature_names, [
+        age, gender_enc, chest_enc,
+        float(resting_bp), float(cholesterol), fasting_enc,
+        ecg_enc, max_hr, angina_enc, float(oldpeak), slope_enc
     ])
 }])
 
@@ -704,16 +695,16 @@ if predict_btn:
                           '< 200 mg/dl', '< 120 mg/dl (No)', 'NORMAL',
                           '100–170 bpm', 'No', '0.0–1.0', 'UP'],
         'Status'       : [
-            '🔴 Risk Factor' if age > 55             else '🟢 Normal',
+            '🔴 Risk Factor' if age > 55                   else '🟢 Normal',
             '—',
-            '🔴 High Risk'   if 'ASY' in chest       else '🟢 Normal',
-            '🔴 High BP'     if resting_bp > 120     else '🟢 Normal',
-            '🔴 High'        if cholesterol >= 200   else '🟢 Normal',
-            '🔴 Elevated'    if fasting_bs == 'Yes'  else '🟢 Normal',
-            '🟢 Normal'      if resting_ecg == 'NORMAL' else '🔴 Abnormal',
-            '🔴 Low'         if max_hr < 100         else '🟢 Normal',
-            '🔴 Present'     if ex_angina == 'Yes'   else '🟢 Normal',
-            '🔴 High'        if oldpeak > 1.0        else '🟢 Normal',
+            '🔴 High Risk'   if 'ASY' in chest             else '🟢 Normal',
+            '🔴 High BP'     if resting_bp > 120           else '🟢 Normal',
+            '🔴 High'        if cholesterol >= 200         else '🟢 Normal',
+            '🔴 Elevated'    if fasting_bs == 'Yes'        else '🟢 Normal',
+            '🟢 Normal'      if resting_ecg == 'NORMAL'    else '🔴 Abnormal',
+            '🔴 Low'         if max_hr < 100               else '🟢 Normal',
+            '🔴 Present'     if ex_angina == 'Yes'         else '🟢 Normal',
+            '🔴 High'        if oldpeak > 1.0              else '🟢 Normal',
             '🔴 Risk'        if st_slope in ['FLAT','DOWN'] else '🟢 Normal',
         ]
     })
