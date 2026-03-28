@@ -502,29 +502,78 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
     story.append(leg_tbl)
     story.append(Spacer(1, 0.35*cm))
 
-    # High risk notice
-    if pred == 1:
-        alert_style = ParagraphStyle('Alert',    fontName='Helvetica-Bold', fontSize=11, textColor=WHITE, alignment=TA_CENTER, leading=16)
-        alert_sub   = ParagraphStyle('AlertSub', fontName='Helvetica',      fontSize=9.5,textColor=colors.HexColor('#FDEDEC'), alignment=TA_CENTER, leading=14)
-        alert_data  = [
-            [Paragraph("IMPORTANT — HIGH RISK DETECTED", alert_style)],
-            [Paragraph(
-                "Based on the clinical values above, this patient shows signs of elevated cardiac risk. "
-                "Please consult a Cardiologist at the earliest for a thorough examination, ECG, "
-                "echocardiogram, and appropriate treatment.",
-                alert_sub)],
-        ]
-        alert_tbl = Table(alert_data, colWidths=[W])
-        alert_tbl.setStyle(TableStyle([
-            ('BACKGROUND',    (0,0), (0,0), colors.HexColor('#922B21')),
-            ('BACKGROUND',    (0,1), (0,1), colors.HexColor('#C0392B')),
-            ('TOPPADDING',    (0,0), (-1,-1), 10),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 10),
-            ('LEFTPADDING',   (0,0), (-1,-1), 14),
-            ('RIGHTPADDING',  (0,0), (-1,-1), 14),
-            ('LINEABOVE',     (0,0), (-1,0),  3, colors.HexColor('#7B241C')),
-        ]))
-        story.append(alert_tbl)
+    # ── 3-Level Risk Advice Block ──────────────────────────────
+    disease_prob_pct = proba[1] * 100   # e.g. 72.3
+
+    if disease_prob_pct < 30:
+        # ── LOW RISK ──
+        box_top_bg  = colors.HexColor('#1A5C2A')
+        box_bot_bg  = colors.HexColor('#1E8449')
+        border_col  = colors.HexColor('#145A32')
+        title_text  = "✔  LOW RISK — Keep Up the Good Work!"
+        body_text   = (
+            f"Your heart disease probability is {disease_prob_pct:.1f}% — well within the safe range. "
+            "Your clinical values indicate a healthy cardiovascular profile. "
+            "To maintain this: follow a balanced diet rich in fruits, vegetables, and whole grains; "
+            "exercise at least 30 minutes a day, 5 days a week; avoid smoking and limit alcohol; "
+            "get 7–8 hours of sleep; and manage stress through yoga or meditation. "
+            "Schedule a routine health checkup every 12 months to stay on track."
+        )
+    elif disease_prob_pct < 60:
+        # ── MODERATE RISK ──
+        box_top_bg  = colors.HexColor('#7D5A00')
+        box_bot_bg  = colors.HexColor('#D4A017')
+        border_col  = colors.HexColor('#6E4E00')
+        title_text  = "⚠  MODERATE RISK — Take Preventive Action"
+        body_text   = (
+            f"Your heart disease probability is {disease_prob_pct:.1f}% — this is a moderate risk level "
+            "that requires attention. Some of your clinical values are outside the normal range. "
+            "Suggestions: reduce salt and saturated fat intake to manage blood pressure and cholesterol; "
+            "begin a light-to-moderate exercise routine (walking, cycling, swimming) for 30 minutes daily; "
+            "monitor your blood pressure and blood sugar at home weekly; quit smoking if applicable; "
+            "reduce stress and improve sleep habits. "
+            "Consult a general physician within the next 2–4 weeks for a full evaluation."
+        )
+    else:
+        # ── HIGH RISK ──
+        box_top_bg  = colors.HexColor('#922B21')
+        box_bot_bg  = colors.HexColor('#C0392B')
+        border_col  = colors.HexColor('#7B241C')
+        title_text  = "🚨  HIGH RISK — Immediate Medical Attention Required"
+        body_text   = (
+            f"Your heart disease probability is {disease_prob_pct:.1f}% — this is a high-risk result. "
+            "Multiple clinical values indicate significant cardiovascular stress. "
+            "Please consult a Cardiologist at the earliest without delay. "
+            "Recommended next steps: get a 12-lead ECG and echocardiogram; "
+            "request a lipid profile, blood glucose, and stress test; "
+            "strictly follow any medication prescribed by your doctor; "
+            "avoid strenuous physical activity until cleared by a cardiologist; "
+            "adopt a heart-healthy diet (low sodium, low fat, high fibre) immediately; "
+            "and attend follow-up appointments regularly. Do not ignore these results."
+        )
+
+    alert_title_style = ParagraphStyle('AlertTitle', fontName='Helvetica-Bold',
+                                        fontSize=11, textColor=WHITE,
+                                        alignment=TA_CENTER, leading=16)
+    alert_body_style  = ParagraphStyle('AlertBody',  fontName='Helvetica',
+                                        fontSize=9.5,
+                                        textColor=colors.HexColor('#F8F9FA'),
+                                        alignment=TA_LEFT, leading=15)
+    alert_data = [
+        [Paragraph(title_text, alert_title_style)],
+        [Paragraph(body_text,  alert_body_style)],
+    ]
+    alert_tbl = Table(alert_data, colWidths=[W])
+    alert_tbl.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0), (0,0), box_top_bg),
+        ('BACKGROUND',    (0,1), (0,1), box_bot_bg),
+        ('TOPPADDING',    (0,0), (-1,-1), 10),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 12),
+        ('LEFTPADDING',   (0,0), (-1,-1), 16),
+        ('RIGHTPADDING',  (0,0), (-1,-1), 16),
+        ('LINEABOVE',     (0,0), (-1,0),  3, border_col),
+    ]))
+    story.append(alert_tbl)
 
     doc.build(story)
     buffer.seek(0)
@@ -625,8 +674,8 @@ def render_shap_explanation(model, X_train_bg, input_data, feature_names, pred, 
         st.pyplot(fig, use_container_width=True)
         plt.close(fig)
 
-        # ── Top 3 plain-English explanation ───────────────────
-        st.markdown("#### 🧠 Plain English Explanation")
+        # ── Top 3 explanation ─────────────────────────────────
+        st.markdown("#### 🧠 Explanation")
 
         top3 = order[:3]
         explanation_html = "<div class='ai-box' style='padding:1.2rem 1.5rem;'>"
