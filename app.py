@@ -26,7 +26,7 @@ warnings.filterwarnings('ignore')
 # PAGE CONFIG
 # ─────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Heart Failure Prediction",
+    page_title="Heart Disease Risk Prediction",
     page_icon="❤️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -723,7 +723,7 @@ with st.sidebar:
 # ─────────────────────────────────────────────────────────────
 st.markdown("""
 <div class='main-header'>
-  <h1>❤️ Heart Failure Prediction</h1>
+  <h1>❤️ Heart Disease Risk Prediction</h1>
   <p>Enter patient clinical data below to assess heart disease risk using AI</p>
 </div>
 """, unsafe_allow_html=True)
