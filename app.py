@@ -27,7 +27,7 @@ warnings.filterwarnings('ignore')
 # ─────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Heart Disease Risk Prediction",
-    page_icon="❤️",
+    page_icon="🫀",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -702,7 +702,7 @@ def render_shap_explanation(model, X_train_bg, input_data, feature_names, pred, 
 # SIDEBAR
 # ─────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## ❤️ About This App")
+    st.markdown("## 🫀 About This App")
     st.markdown("Predicts heart disease risk using a **Random Forest** ML model + **AI recommendations** powered by Groq.")
     st.markdown("---")
     st.markdown("### 📊 Model Performance")
@@ -723,7 +723,7 @@ with st.sidebar:
 # ─────────────────────────────────────────────────────────────
 st.markdown("""
 <div class='main-header'>
-  <h1>❤️ Heart Disease Risk Prediction</h1>
+  <h1>🫀 Heart Disease Risk Prediction</h1>
   <p>Enter patient clinical data below to assess heart disease risk using AI</p>
 </div>
 """, unsafe_allow_html=True)
