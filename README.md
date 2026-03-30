@@ -101,7 +101,7 @@ Heart-Disease-Prediction/
 │
 ├── app.py                        # Main Streamlit application
 ├── cleaned_heart.csv             # Cleaned dataset
-├── heart_failure_model.pkl       # Saved ML model (optional)
+├── heart_failure_model.pkl       # Saved ML model
 ├── ML_model_for_heart_Disease.ipynb  # Model training notebook
 ├── Heart_failure_project.ipynb   # EDA notebook
 ├── requirements.txt              # Python dependencies
