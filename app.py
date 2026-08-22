@@ -230,7 +230,7 @@ MONITOR:
 Rules: Be specific to their numbers. No AI/tool mentions. No # headers. No markdown bold (**). Keep each bullet point concise (1-2 lines max)."""
 
     response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",   # ✅ FIXED — was llama-3.3-70b-versatile
+        model="openai/gpt-oss-20b",   # ✅ FIXED — was llama-3.3-70b-versatile
         messages=[{"role": "user", "content": prompt}],
         max_tokens=800,
         temperature=0.65
