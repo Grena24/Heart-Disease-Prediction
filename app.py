@@ -129,22 +129,17 @@ section[data-testid="stSidebar"] {
 
 # ─────────────────────────────────────────────────────────────
 # LOAD & TRAIN MODEL
-# Retrains from CSV every startup — avoids pickle version errors
-# between local Python and Streamlit Cloud. Fast due to caching.
 # ─────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
     df = pd.read_csv("cleaned_heart.csv")
 
-    # Drop extra columns if present
     for col in ['AgeGroup', 'BP_Category']:
         if col in df.columns:
             df = df.drop(columns=[col])
 
-    # Fix cholesterol zeros (missing data entered as 0)
     df['Cholesterol'] = df['Cholesterol'].replace(0, df['Cholesterol'].median())
 
-    # Encode categoricals
     cat_features = ['Gender', 'ChestPainType', 'RestingECG', 'ExerciseAngina', 'ST_Slope']
     le       = LabelEncoder()
     encoders = {}
@@ -155,7 +150,7 @@ def load_model():
     X = df.drop(columns=['HeartDisease'])
     y = df['HeartDisease']
 
-    feature_names = list(X.columns)  # store exact column order
+    feature_names = list(X.columns)
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
@@ -172,7 +167,7 @@ def load_model():
 model, encoders, model_acc, model_auc, feature_names, X_train_bg = load_model()
 
 # ─────────────────────────────────────────────────────────────
-# NORMAL RANGES reference
+# NORMAL RANGES
 # ─────────────────────────────────────────────────────────────
 NORMAL_RANGES = {
     'Age'                : {'normal': '18–55 years',       'flag': lambda v: v > 55},
@@ -188,7 +183,7 @@ NORMAL_RANGES = {
 }
 
 # ─────────────────────────────────────────────────────────────
-# AI RECOMMENDATION — Groq
+# AI RECOMMENDATION — Groq  ✅ FIXED MODEL NAME
 # ─────────────────────────────────────────────────────────────
 def get_ai_recommendation(patient_name, age, gender, chest_pain, bp,
                            cholesterol, max_hr, ex_angina, oldpeak,
@@ -235,7 +230,7 @@ MONITOR:
 Rules: Be specific to their numbers. No AI/tool mentions. No # headers. No markdown bold (**). Keep each bullet point concise (1-2 lines max)."""
 
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="llama3-8b-8192",   # ✅ FIXED — was llama-3.3-70b-versatile
         messages=[{"role": "user", "content": prompt}],
         max_tokens=800,
         temperature=0.65
@@ -243,7 +238,7 @@ Rules: Be specific to their numbers. No AI/tool mentions. No # headers. No markd
     return response.choices[0].message.content
 
 # ─────────────────────────────────────────────────────────────
-# PARSE AI RESPONSE into sections
+# PARSE AI RESPONSE
 # ─────────────────────────────────────────────────────────────
 def parse_ai_response(text):
     sections = {
@@ -386,7 +381,6 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
         ]))
         return tbl
 
-    # Patient info
     story.append(section_label(" PATIENT INFORMATION"))
     story.append(Spacer(1, 0.2*cm))
     pi_data = [
@@ -407,7 +401,6 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
     story.append(pi_tbl)
     story.append(Spacer(1, 0.35*cm))
 
-    # Prediction result
     story.append(section_label(" PREDICTION RESULT"))
     story.append(Spacer(1, 0.2*cm))
     risk_label = "HIGH RISK — Heart Disease Detected" if pred == 1 else "LOW RISK — No Heart Disease Detected"
@@ -429,7 +422,6 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
     story.append(res_tbl)
     story.append(Spacer(1, 0.35*cm))
 
-    # Clinical values table
     story.append(section_label(" CLINICAL VALUES — PATIENT RESULT vs NORMAL RANGE"))
     story.append(Spacer(1, 0.2*cm))
     col_headers = [
@@ -484,7 +476,6 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
     story.append(clin_tbl)
     story.append(Spacer(1, 0.3*cm))
 
-    # Legend
     legend_data = [[
         Paragraph("<font color='#1E8449'><b> NORMAL</b></font> Value is within healthy range",
                   ParagraphStyle("lg",  fontName="Helvetica", fontSize=8.5, textColor=DGRAY)),
@@ -502,11 +493,9 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
     story.append(leg_tbl)
     story.append(Spacer(1, 0.35*cm))
 
-    # ── 3-Level Risk Advice Block ──────────────────────────────
-    disease_prob_pct = proba[1] * 100   # e.g. 72.3
+    disease_prob_pct = proba[1] * 100
 
     if disease_prob_pct < 30:
-        # ── LOW RISK ──
         box_top_bg  = colors.HexColor('#1A5C2A')
         box_bot_bg  = colors.HexColor('#1E8449')
         border_col  = colors.HexColor('#145A32')
@@ -520,7 +509,6 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
             "Schedule a routine health checkup every 12 months to stay on track."
         )
     elif disease_prob_pct < 60:
-        # ── MODERATE RISK ──
         box_top_bg  = colors.HexColor('#7D5A00')
         box_bot_bg  = colors.HexColor('#D4A017')
         border_col  = colors.HexColor('#6E4E00')
@@ -535,7 +523,6 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
             "Consult a general physician within the next 2–4 weeks for a full evaluation."
         )
     else:
-        # ── HIGH RISK ──
         box_top_bg  = colors.HexColor('#922B21')
         box_bot_bg  = colors.HexColor('#C0392B')
         border_col  = colors.HexColor('#7B241C')
@@ -582,8 +569,6 @@ def generate_pdf_report(patient_name, age, gender, chest_pain, resting_bp,
 # ─────────────────────────────────────────────────────────────
 # SHAP EXPLAINABILITY
 # ─────────────────────────────────────────────────────────────
-
-# Human-readable labels for feature names
 FEATURE_LABELS = {
     'Age'               : 'Age',
     'Gender'            : 'Gender',
@@ -615,27 +600,22 @@ def render_shap_explanation(model, X_train_bg, input_data, feature_names, pred, 
     """, unsafe_allow_html=True)
 
     with st.spinner("🔬 Computing SHAP values..."):
-        # Use a small background sample for speed
         bg_sample  = shap.sample(X_train_bg, 100, random_state=42)
         explainer  = shap.TreeExplainer(model, bg_sample)
         shap_vals  = explainer(input_data)
 
-        # For binary classification, take class-1 (disease) SHAP values
         if hasattr(shap_vals, 'values') and shap_vals.values.ndim == 3:
-            sv = shap_vals.values[0, :, 1]   # shape: (n_features,) for class 1
+            sv = shap_vals.values[0, :, 1]
         else:
             sv = shap_vals.values[0]
 
-        # Build readable labels
         labels = [FEATURE_LABELS.get(f, f) for f in feature_names]
 
-        # Sort by absolute impact
         order      = sorted(range(len(sv)), key=lambda i: abs(sv[i]), reverse=True)
         sv_sorted  = [sv[i]     for i in order]
         lab_sorted = [labels[i] for i in order]
         colors_bar = ['#e74c3c' if v > 0 else '#2ecc71' for v in sv_sorted]
 
-        # ── Plot ──────────────────────────────────────────────
         fig, ax = plt.subplots(figsize=(8, 4.5))
         fig.patch.set_facecolor('#0f0c29')
         ax.set_facecolor('#1a1a2e')
@@ -643,7 +623,6 @@ def render_shap_explanation(model, X_train_bg, input_data, feature_names, pred, 
         bars = ax.barh(lab_sorted[::-1], sv_sorted[::-1],
                        color=colors_bar[::-1], edgecolor='none', height=0.6)
 
-        # Value labels on bars
         for bar, val in zip(bars, sv_sorted[::-1]):
             x_pos = bar.get_width()
             align = 'left' if x_pos >= 0 else 'right'
@@ -660,7 +639,6 @@ def render_shap_explanation(model, X_train_bg, input_data, feature_names, pred, 
             spine.set_edgecolor('#ffffff22')
         ax.xaxis.label.set_color('#adb5bd')
 
-        # Legend
         from matplotlib.patches import Patch
         legend_elements = [
             Patch(facecolor='#e74c3c', label='↑ Increases disease risk'),
@@ -674,7 +652,6 @@ def render_shap_explanation(model, X_train_bg, input_data, feature_names, pred, 
         st.pyplot(fig, use_container_width=True)
         plt.close(fig)
 
-        # ── Top 3 explanation ─────────────────────────────────
         st.markdown("#### 🧠 Explanation")
 
         top3 = order[:3]
@@ -778,7 +755,7 @@ if max_hr < 60:
     st.warning("⚠️ Max Heart Rate below 60 bpm is unusually low. Please double-check the value.")
 
 # ─────────────────────────────────────────────────────────────
-# ENCODE INPUTS — uses exact feature_names order from training
+# ENCODE INPUTS
 # ─────────────────────────────────────────────────────────────
 gender_enc  = encoders['Gender']['M']         if gender    == "Male" else encoders['Gender']['F']
 chest_enc   = encoders['ChestPainType'][chest.split(" ")[0].strip()]
@@ -787,7 +764,6 @@ angina_enc  = encoders['ExerciseAngina']['Y'] if ex_angina == "Yes"  else encode
 slope_enc   = encoders['ST_Slope'][st_slope]
 fasting_enc = 1 if fasting_bs == "Yes" else 0
 
-# Build DataFrame using exact feature_names order from training
 input_data = pd.DataFrame([{
     col: v for col, v in zip(feature_names, [
         age, gender_enc, chest_enc,
@@ -854,7 +830,6 @@ if predict_btn:
 
     st.markdown("---")
 
-    # Patient summary table
     st.markdown("<div class='section-header'>📝 Patient Summary</div>", unsafe_allow_html=True)
     summary_df = pd.DataFrame({
         'Parameter'    : ['Age', 'Gender', 'Chest Pain', 'Resting BP', 'Cholesterol',
@@ -883,11 +858,9 @@ if predict_btn:
     st.dataframe(summary_df, use_container_width=True, hide_index=True)
     st.markdown("---")
 
-    # SHAP Explainability
     render_shap_explanation(model, X_train_bg, input_data, feature_names, pred, proba)
     st.markdown("---")
 
-    # AI Recommendations
     st.markdown("<div class='section-header'>🤖 AI Health Recommendations</div>", unsafe_allow_html=True)
     ai_sections = {}
     with st.spinner(f"🧠 Generating personalised recommendations for {patient_name}..."):
@@ -907,7 +880,6 @@ if predict_btn:
 
     st.markdown("---")
 
-    # PDF Download
     st.markdown("<div class='section-header'>📄 Download Report</div>", unsafe_allow_html=True)
     if ai_sections:
         with st.spinner("📝 Preparing your PDF report..."):
